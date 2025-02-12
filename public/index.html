@@ -37,6 +37,16 @@
             font-size: 0.8em;
             color: #999;
         }
+        .connected-number {
+            color: #25D366;
+            font-weight: bold;
+            font-size: 1.2em;
+            margin: 20px 0;
+            padding: 10px;
+            background-color: #DCF8C6;
+            border-radius: 5px;
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -44,6 +54,7 @@
 <div id="qrCodeContainer">
     <p>Waiting for QR Code...</p>
 </div>
+<div id="connectedNumber" class="connected-number"></div>
 <div class="chat-view" id="chatView"></div>
 <script src="/socket.io/socket.io.js"></script>
 <script src="script.js"></script>
