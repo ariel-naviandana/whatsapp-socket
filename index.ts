@@ -1,7 +1,7 @@
 import express from 'express'
 import { Server } from 'socket.io'
 import http from 'http'
-import { Client, LocalAuth } from 'whatsapp-web.js'
+import { Client, LocalAuth, Message } from 'whatsapp-web.js'
 import qrcode from 'qrcode-terminal'
 import path from 'path'
 
@@ -27,6 +27,7 @@ const client = new Client({
 
 let qrCode: string | null = null
 let connectedNumber: string | null = null
+let userName: string | null = null
 
 client.on('qr', (qr) => {
     qrCode = qr
@@ -38,16 +39,48 @@ client.on('ready', async () => {
     console.log('Client is ready!')
     const info = await client.info
     connectedNumber = info.wid.user
-    io.emit('ready', { phoneNumber: connectedNumber })
-    console.log('Connected with number:', connectedNumber)
+    userName = info.pushname
+    io.emit('ready', { phoneNumber: connectedNumber, userName: userName })
+    console.log(userName, ' connected with number: ', connectedNumber)
 })
 
-client.on('message', message => {
+client.on('message', async (message: Message) => {
     console.log('MESSAGE RECEIVED', message)
+
     io.emit('message', {
+        id: message.id,
         sender: message.from,
         message: message.body,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        isRead: false,
+        chatId: message.from
+    })
+})
+
+io.on('connection', (socket) => {
+    console.log('a user connected')
+
+    if (connectedNumber && userName) {
+        socket.emit('ready', { phoneNumber: connectedNumber, userName: userName })
+    } else if (qrCode) {
+        socket.emit('qr', qrCode)
+    }
+
+    socket.on('markMessageAsRead', async ({ messageId, chatId }) => {
+        try {
+            const chat = await client.getChatById(chatId)
+            if (chat) {
+                await chat.sendSeen()
+                io.emit('messageRead', messageId)
+                console.log('Message marked as read:', messageId)
+            }
+        } catch (error) {
+            console.error('Error marking message as read:', error)
+        }
+    })
+
+    socket.on('disconnect', () => {
+        console.log('user disconnected')
     })
 })
 
@@ -63,19 +96,6 @@ client.on('disconnected', (reason) => {
 
 client.initialize().catch(err => {
     console.error('Failed to initialize client:', err)
-})
-
-io.on('connection', (socket) => {
-    console.log('a user connected')
-    if (connectedNumber) {
-        socket.emit('ready', { phoneNumber: connectedNumber })
-    } else if (qrCode) {
-        socket.emit('qr', qrCode)
-    }
-
-    socket.on('disconnect', () => {
-        console.log('user disconnected')
-    })
 })
 
 app.use(express.static(path.join(__dirname, 'public')))
