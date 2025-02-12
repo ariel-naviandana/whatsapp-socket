@@ -3,61 +3,330 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WhatsApp Chat View</title>
+    <title>WhatsApp Web Client</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            text-align: center;
-            background-color: #f9f9f9;
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         }
-        .chat-view {
-            width: 400px;
-            margin: 20px auto;
-            padding: 20px;
-            border: 1px solid #ccc;
-            border-radius: 10px;
+
+        body {
+            background-color: #f0f2f5;
+            height: 100vh;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+            background-color: #fff;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        .sidebar {
+            width: 350px;
+            border-right: 1px solid #e9edef;
+            display: flex;
+            flex-direction: column;
             background-color: #fff;
         }
-        .chat-message {
-            margin-bottom: 15px;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            background-color: #f1f1f1;
+
+        .user-info {
+            padding: 15px;
+            background-color: #008069;
+            color: white;
         }
-        .chat-message-header {
+
+        .user-name {
+            font-size: 16px;
+            font-weight: 500;
+        }
+
+        .user-number {
+            font-size: 13px;
+            opacity: 0.9;
+        }
+
+        .search-container {
+            padding: 8px;
+            background-color: #f0f2f5;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 8px 32px 8px 12px;
+            border: none;
+            border-radius: 8px;
+            background-color: white;
+            font-size: 14px;
+        }
+
+        .chat-list {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .chat-item {
+            padding: 12px 15px;
             display: flex;
-            justify-content: space-between;
+            flex-direction: column;
+            border-bottom: 1px solid #f0f2f5;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .chat-item:hover {
+            background-color: #f5f6f6;
+        }
+
+        .chat-item.active {
+            background-color: #f0f2f5;
+        }
+
+        .chat-name {
+            font-size: 16px;
+            color: #111b21;
+            margin-bottom: 4px;
+        }
+
+        .chat-preview {
+            font-size: 13px;
+            color: #667781;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .chat-time {
+            font-size: 12px;
+            color: #667781;
+            margin-top: 2px;
+        }
+
+        .main-chat {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background-color: #efeae2;
+        }
+
+        .chat-header {
+            padding: 15px;
+            background-color: #f0f2f5;
+            border-bottom: 1px solid #e9edef;
+            display: flex;
+            align-items: center;
+        }
+
+        .chat-header h3 {
+            color: #111b21;
+            font-weight: 500;
+            font-size: 16px;
+        }
+
+        .messages-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background-image: url('https://web.whatsapp.com/img/bg-chat-tile-dark_a4be512e7195b6b733d9110b408f075d.png');
+            background-repeat: repeat;
+        }
+
+        .message {
+            max-width: 65%;
+            margin-bottom: 12px;
+            position: relative;
+            clear: both;
+        }
+
+        .message.received {
+            float: left;
+            background-color: white;
+            border-radius: 0 8px 8px 8px;
+            padding: 6px 7px 8px 9px;
+        }
+
+        .message.sent {
+            float: right;
+            background-color: #d9fdd3;
+            border-radius: 8px 0 8px 8px;
+            padding: 6px 7px 8px 9px;
+        }
+
+        .message-sender {
+            font-size: 12.8px;
+            font-weight: 500;
+            color: #1f7aff;
+            margin-bottom: 2px;
+        }
+
+        .message-text {
+            font-size: 14px;
+            color: #111b21;
+            line-height: 1.4;
+        }
+
+        .message-time {
+            font-size: 11px;
+            color: #667781;
+            margin-top: 2px;
+            float: right;
+        }
+
+        .chat-footer {
+            padding: 10px;
+            background-color: #f0f2f5;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .message-input {
+            flex: 1;
+            padding: 9px 12px;
+            border: none;
+            border-radius: 8px;
+            background-color: white;
+            font-size: 15px;
+            resize: none;
+            max-height: 100px;
+            min-height: 20px;
+            line-height: 1.4;
+        }
+
+        .message-input:focus {
+            outline: none;
+        }
+
+        .attach-button, .send-button {
+            background: none;
+            border: none;
+            padding: 8px;
+            cursor: pointer;
+            color: #54656f;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .attach-button:hover, .send-button:hover {
+            background-color: #e9edef;
+        }
+
+        #qrCodeContainer {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+            text-align: center;
+            z-index: 1000;
+        }
+
+        #qrCodeContainer p {
+            margin-bottom: 15px;
+            color: #41525d;
+        }
+
+        #qrCodeContainer img {
+            max-width: 264px;
+            height: auto;
+        }
+
+        .media-message img, .media-message video {
+            max-width: 330px;
+            border-radius: 4px;
             margin-bottom: 5px;
         }
-        .chat-message-sender {
-            font-weight: bold;
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #667781;
         }
-        .chat-message-timestamp {
-            font-size: 0.8em;
-            color: #999;
+
+        .error {
+            text-align: center;
+            padding: 20px;
+            color: #dc3545;
         }
-        .info {
-            color: #25D366;
-            font-weight: bold;
-            font-size: 1.2em;
-            margin: 20px 0;
-            padding: 10px;
-            background-color: #DCF8C6;
-            border-radius: 5px;
-            display: none;
+
+        @media (max-width: 768px) {
+            .sidebar {
+                position: fixed;
+                left: -100%;
+                top: 0;
+                bottom: 0;
+                z-index: 100;
+                transition: 0.3s;
+            }
+
+            .sidebar.active {
+                left: 0;
+            }
+
+            .main-chat {
+                width: 100%;
+            }
         }
     </style>
 </head>
 <body>
-<h1>WhatsApp Chat View</h1>
-<div id="qrCodeContainer">
-    <p>Waiting for QR Code...</p>
+<div class="container">
+    <div class="sidebar">
+        <div class="user-info">
+            <div id="userName" class="user-name"></div>
+            <div id="connectedNumber" class="user-number"></div>
+        </div>
+        <div class="search-container">
+            <input type="text" class="search-input" placeholder="Search or start new chat" id="searchInput">
+        </div>
+        <div class="chat-list" id="chatList"></div>
+    </div>
+
+    <div class="main-chat">
+        <div class="chat-header" id="chatHeader">
+            <h3>Select a chat to start messaging</h3>
+        </div>
+
+        <div class="messages-container" id="messagesContainer"></div>
+
+        <div class="chat-footer">
+            <button class="attach-button" id="attachButton">
+                <i class="fas fa-paperclip"></i>
+            </button>
+            <input type="file" id="fileInput" style="display: none" accept="image/*,video/*">
+            <textarea
+                    class="message-input"
+                    id="messageInput"
+                    placeholder="Type a message"
+                    rows="1"
+            ></textarea>
+            <button class="send-button" id="sendButton">
+                <i class="fas fa-paper-plane"></i>
+            </button>
+        </div>
+    </div>
 </div>
-<div id="userName" class="info"></div>
-<div id="connectedNumber" class="info"></div>
-<div class="chat-view" id="chatView"></div>
+
+<div id="qrCodeContainer" style="display: none">
+    <p>Scan QR code with WhatsApp on your phone</p>
+    <div id="qrCode"></div>
+</div>
+
+<audio id="notificationSound" src="notification.mp3" style="display: none"></audio>
+
 <script src="/socket.io/socket.io.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/moment/2.29.1/moment.min.js"></script>
 <script src="script.js"></script>
 </body>
 </html>

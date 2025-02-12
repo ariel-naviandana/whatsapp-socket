@@ -1,13 +1,42 @@
-import express from 'express'
+import express, { RequestHandler } from 'express'
 import { Server } from 'socket.io'
 import http from 'http'
-import { Client, LocalAuth, Message } from 'whatsapp-web.js'
+import { Client, LocalAuth, Message, MessageMedia } from 'whatsapp-web.js'
 import qrcode from 'qrcode-terminal'
 import path from 'path'
+import moment from 'moment'
+import multer from 'multer'
+
+interface SendMessageBody {
+    chatId: string
+    message: string
+}
+
+interface MessageData {
+    id: string
+    sender: string
+    senderName: string
+    message: string
+    timestamp: string
+    isRead: boolean
+    chatId: string
+    mediaUrl: string | null
+    type: string
+    fromMe: boolean
+}
 
 const app = express()
 const server = http.createServer(app)
 const io = new Server(server)
+
+app.use(express.json())
+app.use(express.static(path.join(__dirname, 'public')))
+
+const upload = multer({
+    limits: {
+        fileSize: 16 * 1024 * 1024
+    }
+})
 
 const client = new Client({
     authStrategy: new LocalAuth(),
@@ -33,35 +62,159 @@ client.on('qr', (qr) => {
     qrCode = qr
     qrcode.generate(qr, { small: true })
     io.emit('qr', qr)
+    console.log('QR Code generated')
 })
 
 client.on('ready', async () => {
-    console.log('Client is ready!')
-    const info = await client.info
+    const info = client.info
     connectedNumber = info.wid.user
     userName = info.pushname
-    io.emit('ready', { phoneNumber: connectedNumber, userName: userName })
-    console.log(userName, ' connected with number: ', connectedNumber)
+
+    const chats = await client.getChats()
+    const chatList = await Promise.all(chats.map(async (chat) => {
+        const lastMsg = chat.lastMessage || {}
+        return {
+            id: chat.id._serialized,
+            name: chat.name,
+            lastMessage: lastMsg.body || '',
+            timestamp: lastMsg.timestamp || Date.now(),
+            unreadCount: chat.unreadCount
+        }
+    }))
+
+    io.emit('ready', {
+        phoneNumber: connectedNumber,
+        userName: userName,
+        chats: chatList
+    })
+    console.log('WhatsApp client ready')
 })
 
 client.on('message', async (message: Message) => {
-    console.log('MESSAGE RECEIVED', message)
-
-    io.emit('message', {
-        id: message.id,
-        sender: message.from,
-        message: message.body,
-        timestamp: new Date().toISOString(),
-        isRead: false,
-        chatId: message.from
+    console.log('New message received on server:', {
+        id: message.id._serialized,
+        from: message.from,
+        body: message.body,
+        timestamp: message.timestamp
     })
+
+    const timestamp = new Date(message.timestamp * 1000)
+
+    let mediaUrl = null
+    if (message.hasMedia) {
+        try {
+            const media = await message.downloadMedia()
+            mediaUrl = `data:${media.mimetype};base64,${media.data}`
+        } catch (error) {
+            console.error('Error downloading media:', error)
+        }
+    }
+
+    let senderName = message.from.split('@')[0]
+    try {
+        const contact = await message.getContact()
+        senderName = contact.pushname || contact.name || senderName
+    } catch (error) {
+        console.error('Error getting contact info:', error)
+    }
+
+    const messageData: MessageData = {
+        id: message.id._serialized,
+        sender: message.from,
+        senderName: senderName,
+        message: message.body,
+        timestamp: timestamp.toISOString(),
+        isRead: false,
+        chatId: message.from,
+        mediaUrl,
+        type: message.type,
+        fromMe: message.fromMe
+    }
+
+    console.log('Emitting message data:', messageData)
+    io.emit('message', messageData)
 })
 
+const sendMessageHandler: RequestHandler = async (req, res) => {
+    try {
+        const { chatId, message } = req.body as SendMessageBody
+        const media = req.file
+
+        if (media) {
+            const messageMedia = new MessageMedia(
+                media.mimetype,
+                media.buffer.toString('base64'),
+                media.originalname
+            )
+            await client.sendMessage(chatId, messageMedia, { caption: message })
+        } else {
+            await client.sendMessage(chatId, message)
+        }
+
+        res.json({ success: true })
+    } catch (error) {
+        console.error('Error sending message:', error)
+        res.status(500).json({ error: 'Failed to send message' })
+    }
+}
+
+const getChatHistoryHandler: RequestHandler = async (req, res) => {
+    try {
+        const { chatId } = req.params
+        const chat = await client.getChatById(chatId)
+        const messages = await chat.fetchMessages({ limit: 50 })
+
+        const formattedMessages = await Promise.all(messages.map(async (msg) => {
+            let mediaUrl = null
+            if (msg.hasMedia) {
+                try {
+                    const media = await msg.downloadMedia()
+                    mediaUrl = `data:${media.mimetype};base64,${media.data}`
+                } catch (error) {
+                    console.error('Error downloading media:', error)
+                }
+            }
+
+            let senderName = msg.from.split('@')[0]
+            try {
+                const contact = await msg.getContact()
+                senderName = contact.pushname || contact.name || senderName
+            } catch (error) {
+                console.error('Error getting contact info:', error)
+            }
+
+            return {
+                id: msg.id._serialized,
+                sender: msg.from,
+                senderName: senderName,
+                message: msg.body,
+                timestamp: moment(msg.timestamp * 1000).toISOString(),
+                isRead: msg.isStatus,
+                chatId: msg.from,
+                mediaUrl,
+                type: msg.type,
+                fromMe: msg.fromMe
+            }
+        }))
+
+        res.json(formattedMessages)
+    } catch (error) {
+        console.error('Error fetching chat history:', error)
+        res.status(500).json({ error: 'Failed to fetch chat history' })
+    }
+}
+
+app.post('/api/send-message', upload.single('media'), sendMessageHandler)
+app.get('/api/chat-history/:chatId', getChatHistoryHandler)
+
 io.on('connection', (socket) => {
-    console.log('a user connected')
+    console.log('New client connected')
 
     if (connectedNumber && userName) {
-        socket.emit('ready', { phoneNumber: connectedNumber, userName: userName })
+        socket.emit('ready', {
+            phoneNumber: connectedNumber,
+            userName: userName
+        })
     } else if (qrCode) {
         socket.emit('qr', qrCode)
     }
@@ -72,33 +225,27 @@ io.on('connection', (socket) => {
             if (chat) {
                 await chat.sendSeen()
                 io.emit('messageRead', messageId)
-                console.log('Message marked as read:', messageId)
             }
         } catch (error) {
             console.error('Error marking message as read:', error)
         }
     })
-
-    socket.on('disconnect', () => {
-        console.log('user disconnected')
-    })
 })
 
 client.on('disconnected', (reason) => {
-    console.log('Client was disconnected', reason)
+    console.log('Client disconnected:', reason)
     qrCode = null
     connectedNumber = null
+    userName = null
     io.emit('disconnected', reason)
-    client.initialize().catch(err => {
-        console.error('Failed to reinitialize client:', err)
-    })
+    client.initialize()
 })
 
-client.initialize().catch(err => {
-    console.error('Failed to initialize client:', err)
+io.on('connect_error', (error) => {
+    console.error('Socket connection error:', error)
 })
 
-app.use(express.static(path.join(__dirname, 'public')))
+client.initialize()
 
 const PORT = process.env.PORT || 3001
 server.listen(PORT, () => {
@@ -106,7 +253,6 @@ server.listen(PORT, () => {
 })
 
 process.on('SIGINT', async () => {
-    console.log('Shutting down...')
     try {
         await client.destroy()
         server.close()
