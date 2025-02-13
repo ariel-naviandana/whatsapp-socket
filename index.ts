@@ -65,20 +65,22 @@ client.on('qr', (qr) => {
     console.log('QR Code generated')
 })
 
+let chatList: any[] = []
+
 client.on('ready', async () => {
     const info = client.info
     connectedNumber = info.wid.user
     userName = info.pushname
 
     const chats = await client.getChats()
-    const chatList = await Promise.all(chats.map(async (chat) => {
+    chatList = await Promise.all(chats.map(async (chat) => {
         const lastMsg = chat.lastMessage || {}
         return {
             id: chat.id._serialized,
             name: chat.name,
             lastMessage: lastMsg.body || '',
             timestamp: lastMsg.timestamp || Date.now(),
-            unreadCount: chat.unreadCount
+            unreadCount: chat.unreadCount,
         }
     }))
 
@@ -86,7 +88,7 @@ client.on('ready', async () => {
         phoneNumber: connectedNumber,
         userName: userName,
         chats: chatList
-    })
+    });
     console.log('WhatsApp client ready')
 })
 
@@ -229,9 +231,11 @@ io.on('connection', (socket) => {
     if (connectedNumber && userName) {
         socket.emit('ready', {
             phoneNumber: connectedNumber,
-            userName: userName
+            userName: userName,
+            chats: chatList
         })
-    } else if (qrCode) {
+    } else
+        if (qrCode) {
         socket.emit('qr', qrCode)
     }
 
@@ -241,7 +245,6 @@ io.on('connection', (socket) => {
             if (chat) {
                 await chat.sendSeen()
                 io.emit('messageRead', messageId)
-                console.log('Message marked as read:', messageId)
             }
         } catch (error) {
             console.error('Error marking message as read:', error)
