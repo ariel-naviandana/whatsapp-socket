@@ -65,6 +65,47 @@ client.on('qr', (qr) => {
     console.log('QR Code generated')
 })
 
+async function emitChatDetails(chat: any) {
+    const messages = await chat.fetchMessages({ limit: 50 })
+    const formattedMessages = await Promise.all(messages.map(async (msg: any) => {
+        let mediaUrl = null
+        if (msg.hasMedia) {
+            try {
+                const media = await msg.downloadMedia()
+                mediaUrl = `data:${media.mimetype};base64,${media.data}`
+            } catch (error) {
+                console.error('Error downloading media:', error)
+            }
+        }
+
+        let senderName = msg.from.split('@')[0]
+        try {
+            const contact = await msg.getContact()
+            senderName = contact.pushname || contact.name || senderName
+        } catch (error) {
+            console.error('Error getting contact info:', error)
+        }
+
+        return {
+            id: msg.id._serialized,
+            sender: msg.from,
+            senderName: senderName,
+            message: msg.body,
+            timestamp: moment(msg.timestamp * 1000).toISOString(),
+            isRead: msg.isStatus,
+            chatId: msg.from,
+            mediaUrl,
+            type: msg.type,
+            fromMe: msg.fromMe
+        }
+    }))
+
+    io.emit('chatHistory', {
+        chatId: chat.id._serialized,
+        messages: formattedMessages
+    })
+}
+
 client.on('ready', async () => {
     const info = client.info
     connectedNumber = info.wid.user
@@ -73,6 +114,9 @@ client.on('ready', async () => {
     const chats = await client.getChats()
     const chatList = await Promise.all(chats.map(async (chat) => {
         const lastMsg = chat.lastMessage || {}
+
+        await emitChatDetails(chat)
+
         return {
             id: chat.id._serialized,
             name: chat.name,
@@ -91,13 +135,6 @@ client.on('ready', async () => {
 })
 
 client.on('message', async (message: Message) => {
-    console.log('New message received on server:', {
-        id: message.id._serialized,
-        from: message.from,
-        body: message.body,
-        timestamp: message.timestamp
-    })
-
     const timestamp = new Date(message.timestamp * 1000)
 
     let mediaUrl = null
@@ -131,7 +168,6 @@ client.on('message', async (message: Message) => {
         fromMe: message.fromMe
     }
 
-    console.log('Emitting message data:', messageData)
     io.emit('message', messageData)
 })
 
@@ -140,17 +176,32 @@ const sendMessageHandler: RequestHandler = async (req, res) => {
         const { chatId, message } = req.body as SendMessageBody
         const media = req.file
 
+        let sentMessage
         if (media) {
             const messageMedia = new MessageMedia(
                 media.mimetype,
                 media.buffer.toString('base64'),
                 media.originalname
             )
-            await client.sendMessage(chatId, messageMedia, { caption: message })
+            sentMessage = await client.sendMessage(chatId, messageMedia, { caption: message })
         } else {
-            await client.sendMessage(chatId, message)
+            sentMessage = await client.sendMessage(chatId, message)
         }
 
+        const messageData: MessageData = {
+            id: sentMessage.id._serialized,
+            sender: sentMessage.from,
+            senderName: userName || sentMessage.from.split('@')[0],
+            message: sentMessage.body,
+            timestamp: new Date().toISOString(),
+            isRead: false,
+            chatId: chatId,
+            mediaUrl: null,
+            type: sentMessage.type,
+            fromMe: true
+        }
+
+        io.emit('message', messageData)
         res.json({ success: true })
     } catch (error) {
         console.error('Error sending message:', error)
