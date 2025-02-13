@@ -143,6 +143,10 @@ socket.on('message', (message) => {
     updateChatList(message)
 
     if (currentChat && message.chatId === currentChat.id) {
+        socket.emit('markMessageAsRead', {
+            messageId: message.id,
+            chatId: message.chatId
+        })
         const container = document.getElementById('messagesContainer')
         if (container) {
             const messageElement = createMessageElement(message, message.fromMe)

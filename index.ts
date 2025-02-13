@@ -65,44 +65,6 @@ client.on('qr', (qr) => {
     console.log('QR Code generated')
 })
 
-async function emitChatDetails(chat: any) {
-    const messages = await chat.fetchMessages({ limit: 50 })
-    const formattedMessages = await Promise.all(messages.map(async (msg: any) => {
-        let mediaUrl = null
-        if (msg.hasMedia) {
-            try {
-                const media = await msg.downloadMedia()
-                mediaUrl = `data:${media.mimetype};base64,${media.data}`
-            } catch (error) {
-                console.error('Error downloading media:', error)
-            }
-        }
-        let senderName = msg.from.split('@')[0]
-        try {
-            const contact = await msg.getContact()
-            senderName = contact.pushname || contact.name || senderName
-        } catch (error) {
-            console.error('Error getting contact info:', error)
-        }
-        return {
-            id: msg.id._serialized,
-            sender: msg.from,
-            senderName: senderName,
-            message: msg.body,
-            timestamp: moment(msg.timestamp * 1000).toISOString(),
-            isRead: msg.isStatus,
-            chatId: msg.from,
-            mediaUrl,
-            type: msg.type,
-            fromMe: msg.fromMe
-        }
-    }))
-    io.emit('chatHistory', {
-        chatId: chat.id._serialized,
-        messages: formattedMessages
-    })
-}
-
 client.on('ready', async () => {
     const info = client.info
     connectedNumber = info.wid.user
@@ -279,6 +241,7 @@ io.on('connection', (socket) => {
             if (chat) {
                 await chat.sendSeen()
                 io.emit('messageRead', messageId)
+                console.log('Message marked as read:', messageId)
             }
         } catch (error) {
             console.error('Error marking message as read:', error)
