@@ -57,15 +57,13 @@ const client = new Client({
 let qrCode: string | null = null
 let connectedNumber: string | null = null
 let userName: string | null = null
+let chatList: any[] = []
 
 client.on('qr', (qr) => {
     qrCode = qr
     qrcode.generate(qr, { small: true })
     io.emit('qr', qr)
-    console.log('QR Code generated')
 })
-
-let chatList: any[] = []
 
 client.on('ready', async () => {
     const info = client.info
@@ -80,7 +78,7 @@ client.on('ready', async () => {
             name: chat.name,
             lastMessage: lastMsg.body || '',
             timestamp: lastMsg.timestamp || Date.now(),
-            unreadCount: chat.unreadCount,
+            unreadCount: chat.unreadCount
         }
     }))
 
@@ -88,18 +86,10 @@ client.on('ready', async () => {
         phoneNumber: connectedNumber,
         userName: userName,
         chats: chatList
-    });
-    console.log('WhatsApp client ready')
+    })
 })
 
 client.on('message', async (message: Message) => {
-    console.log('New message received on server:', {
-        id: message.id._serialized,
-        from: message.from,
-        body: message.body,
-        timestamp: message.timestamp
-    })
-
     const timestamp = new Date(message.timestamp * 1000)
 
     let mediaUrl = null
@@ -133,7 +123,6 @@ client.on('message', async (message: Message) => {
         fromMe: message.fromMe
     }
 
-    console.log('Emitting message data:', messageData)
     io.emit('message', messageData)
 })
 
@@ -143,6 +132,8 @@ const sendMessageHandler: RequestHandler = async (req, res) => {
         const media = req.file
 
         let sentMessage
+        let mediaUrl = null
+
         if (media) {
             const messageMedia = new MessageMedia(
                 media.mimetype,
@@ -150,6 +141,7 @@ const sendMessageHandler: RequestHandler = async (req, res) => {
                 media.originalname
             )
             sentMessage = await client.sendMessage(chatId, messageMedia, { caption: message })
+            mediaUrl = `data:${media.mimetype};base64,${media.buffer.toString('base64')}`
         } else {
             sentMessage = await client.sendMessage(chatId, message)
         }
@@ -162,13 +154,12 @@ const sendMessageHandler: RequestHandler = async (req, res) => {
             timestamp: new Date().toISOString(),
             isRead: false,
             chatId: chatId,
-            mediaUrl: null,
-            type: sentMessage.type,
+            mediaUrl,
+            type: media ? 'image' : 'text',
             fromMe: true
         }
 
         io.emit('message', messageData)
-
         res.json({ success: true })
     } catch (error) {
         console.error('Error sending message:', error)
@@ -226,16 +217,13 @@ app.post('/api/send-message', upload.single('media'), sendMessageHandler)
 app.get('/api/chat-history/:chatId', getChatHistoryHandler)
 
 io.on('connection', (socket) => {
-    console.log('New client connected')
-
     if (connectedNumber && userName) {
         socket.emit('ready', {
             phoneNumber: connectedNumber,
             userName: userName,
             chats: chatList
         })
-    } else
-        if (qrCode) {
+    } else if (qrCode) {
         socket.emit('qr', qrCode)
     }
 
@@ -253,7 +241,6 @@ io.on('connection', (socket) => {
 })
 
 client.on('disconnected', (reason) => {
-    console.log('Client disconnected:', reason)
     qrCode = null
     connectedNumber = null
     userName = null

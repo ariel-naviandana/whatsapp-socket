@@ -34,8 +34,6 @@ function formatTimestamp(timestamp) {
 }
 
 function createMessageElement(message, isOwnMessage) {
-    console.log('Creating message element:', { message, isOwnMessage })
-
     const messageElement = document.createElement('div')
     messageElement.className = `message ${isOwnMessage ? 'sent' : 'received'}`
     messageElement.id = `message-${message.id}`
@@ -88,10 +86,7 @@ function createMessageElement(message, isOwnMessage) {
 
 function updateChatList(message) {
     const chatList = document.getElementById('chatList')
-    if (!chatList) {
-        console.error('Chat list not found')
-        return
-    }
+    if (!chatList) return
 
     let chatItem = Array.from(chatList.children).find(
         item => item.dataset.chatId === message.chatId
@@ -137,7 +132,6 @@ socket.on('disconnect', () => {
 })
 
 socket.on('message', (message) => {
-    console.log('New message received:', message)
     messages.set(message.id, message)
 
     updateChatList(message)
@@ -161,7 +155,6 @@ socket.on('message', (message) => {
 })
 
 socket.on('ready', (data) => {
-    console.log('WhatsApp client ready:', data)
     document.getElementById('qrCodeContainer').style.display = 'none'
 
     const userNameEl = document.getElementById('userName')
@@ -184,7 +177,6 @@ socket.on('ready', (data) => {
 })
 
 socket.on('qr', (qr) => {
-    console.log('QR Code received')
     const qrCodeContainer = document.getElementById('qrCodeContainer')
     const qrCodeElement = document.getElementById('qrCode')
 
@@ -230,7 +222,6 @@ async function sendMessage() {
             messageInput.value = ''
             if (fileInput) fileInput.value = ''
             messageInput.placeholder = 'Type a message'
-            console.log('Message sent successfully')
         } else {
             throw new Error('Failed to send message')
         }
