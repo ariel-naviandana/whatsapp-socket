@@ -248,8 +248,6 @@ socket.on('qr', (qr) => {
     }
 })
 
-let typingTimeout = null
-
 async function sendMessage() {
     if (!currentChat) {
         alert('Please select a chat first')
@@ -336,6 +334,8 @@ document.getElementById('messageInput')?.addEventListener('keypress', (e) => {
         sendMessage()
     }
 })
+
+let typingTimeout = null
 
 document.getElementById('messageInput')?.addEventListener('input', (e) => {
     const textarea = e.target

@@ -255,18 +255,20 @@ io.on('connection', (socket) => {
 
     socket.on('markMessageAsRead', async ({ messageId, chatId }) => {
         try {
-            const chat = await client.getChatById(chatId)
-            if (chat) {
-                await chat.sendSeen()
-                io.emit('messageRead', messageId)
-            }
+            const chat = await client.getChatById(chatId).then(chat => chat.sendSeen())
         } catch (error) {
             console.error('Error marking message as read:', error)
         }
     })
 
-    socket.on('typing', ({ chatId, isTyping }) => {
-        socket.broadcast.emit('userTyping', { chatId, isTyping })
+    socket.on('typing', async ({ chatId, isTyping }) => {
+        try {
+            if (isTyping)
+                await client.getChatById(chatId).then(chat => chat.sendStateTyping())
+             socket.broadcast.emit('userTyping', { chatId, isTyping })
+        } catch (error) {
+            console.error('Error handling typing status:', error)
+        }
     })
 })
 
