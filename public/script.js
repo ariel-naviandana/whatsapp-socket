@@ -3,6 +3,12 @@ const messages = new Map()
 let currentChat = null
 const notificationSound = document.getElementById('notificationSound')
 
+const MESSAGE_STATUS = {
+    SENT: '<i class="fas fa-check"></i>',
+    DELIVERED: '<i class="fas fa-check-double"></i>',
+    READ: '<i class="fas fa-check-double text-blue"></i>'
+}
+
 function formatTimestamp(timestamp) {
     if (!timestamp) return ''
 
@@ -75,13 +81,38 @@ function createMessageElement(message, isOwnMessage) {
     messageText.textContent = message.message
     messageContent.appendChild(messageText)
 
-    const messageTime = document.createElement('div')
+    const messageFooter = document.createElement('div')
+    messageFooter.className = 'message-footer'
+
+    const messageTime = document.createElement('span')
     messageTime.className = 'message-time'
     messageTime.textContent = formatTimestamp(message.timestamp)
-    messageContent.appendChild(messageTime)
+    messageFooter.appendChild(messageTime)
 
+    if (isOwnMessage) {
+        const messageStatus = document.createElement('span')
+        messageStatus.className = 'message-status'
+        messageStatus.innerHTML = message.status === 'read'
+            ? MESSAGE_STATUS.READ
+            : message.status === 'delivered'
+                ? MESSAGE_STATUS.DELIVERED
+                : MESSAGE_STATUS.SENT
+        messageFooter.appendChild(messageStatus)
+    }
+
+    messageContent.appendChild(messageFooter)
     messageElement.appendChild(messageContent)
     return messageElement
+}
+
+function updateMessageStatus(messageId, status) {
+    const messageEl = document.getElementById(`message-${messageId}`)
+    if (messageEl) {
+        const statusEl = messageEl.querySelector('.message-status')
+        if (statusEl) {
+            statusEl.innerHTML = MESSAGE_STATUS[status.toUpperCase()]
+        }
+    }
 }
 
 function updateChatList(message) {
@@ -100,11 +131,17 @@ function updateChatList(message) {
     }
 
     const senderName = message.senderName || message.sender.split('@')[0]
+    const isUnread = getUnreadStatus(message.chatId) && (!currentChat || currentChat.id !== message.chatId)
 
     chatItem.innerHTML = `
-        <div class="chat-name">${senderName}</div>
-        <div class="chat-preview">${message.message}</div>
-        <div class="chat-time">${formatTimestamp(message.timestamp)}</div>
+        <div class="chat-header-info">
+            <div class="chat-name">${senderName}</div>
+            <div class="chat-time">${formatTimestamp(message.timestamp)}</div>
+        </div>
+        <div class="chat-preview">
+            ${isUnread ? '<span class="unread-indicator">●</span>' : ''}
+            ${message.message}
+        </div>
     `
 
     chatItem.onclick = () => {
@@ -114,9 +151,18 @@ function updateChatList(message) {
         )
         chatItem.classList.add('active')
 
+        setUnreadStatus(message.chatId, false)
+        const unreadIndicator = chatItem.querySelector('.unread-indicator')
+        if (unreadIndicator) {
+            unreadIndicator.remove()
+        }
+
         const headerEl = document.getElementById('chatHeader')
         if (headerEl) {
-            headerEl.innerHTML = `<h3>${senderName}</h3>`
+            headerEl.innerHTML = `
+                <h3>${senderName}</h3>
+                <div class="typing-status" id="typingStatus-${message.chatId}"></div>
+            `
         }
 
         loadChatHistory(message.chatId)
@@ -133,7 +179,9 @@ socket.on('disconnect', () => {
 
 socket.on('message', (message) => {
     messages.set(message.id, message)
-
+    if (!message.fromMe) {
+        setUnreadStatus(message.chatId, true)
+    }
     updateChatList(message)
 
     if (currentChat && message.chatId === currentChat.id) {
@@ -154,6 +202,17 @@ socket.on('message', (message) => {
     }
 })
 
+socket.on('messageStatus', ({ messageId, status }) => {
+    updateMessageStatus(messageId, status)
+})
+
+socket.on('userTyping', ({ chatId, isTyping }) => {
+    const typingStatus = document.getElementById(`typingStatus-${chatId}`)
+    if (typingStatus) {
+        typingStatus.textContent = isTyping ? 'typing...' : ''
+    }
+})
+
 socket.on('ready', (data) => {
     document.getElementById('qrCodeContainer').style.display = 'none'
 
@@ -170,7 +229,8 @@ socket.on('ready', (data) => {
                 senderName: chat.name,
                 message: chat.lastMessage || '',
                 timestamp: chat.timestamp,
-                sender: chat.id
+                sender: chat.id,
+                unreadCount: chat.unreadCount
             })
         })
     }
@@ -187,6 +247,8 @@ socket.on('qr', (qr) => {
         `
     }
 })
+
+let typingTimeout = null
 
 async function sendMessage() {
     if (!currentChat) {
@@ -222,6 +284,7 @@ async function sendMessage() {
             messageInput.value = ''
             if (fileInput) fileInput.value = ''
             messageInput.placeholder = 'Type a message'
+            messageInput.style.height = 'auto'
         } else {
             throw new Error('Failed to send message')
         }
@@ -251,6 +314,15 @@ function loadChatHistory(chatId) {
                 container.appendChild(messageElement)
             })
             container.scrollTop = container.scrollHeight
+
+            setUnreadStatus(chatId, false)
+            const chatItem = document.querySelector(`.chat-item[data-chat-id="${chatId}"]`)
+            if (chatItem) {
+                const unreadIndicator = chatItem.querySelector('.unread-indicator')
+                if (unreadIndicator) {
+                    unreadIndicator.remove()
+                }
+            }
         })
         .catch(error => {
             console.error('Error loading chat history:', error)
@@ -262,6 +334,24 @@ document.getElementById('messageInput')?.addEventListener('keypress', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault()
         sendMessage()
+    }
+})
+
+document.getElementById('messageInput')?.addEventListener('input', (e) => {
+    const textarea = e.target
+    textarea.style.height = 'auto'
+    textarea.style.height = Math.min(textarea.scrollHeight, 100) + 'px'
+
+    if (currentChat) {
+        socket.emit('typing', { chatId: currentChat.id, isTyping: true })
+
+        if (typingTimeout) {
+            clearTimeout(typingTimeout)
+        }
+
+        typingTimeout = setTimeout(() => {
+            socket.emit('typing', { chatId: currentChat.id, isTyping: false })
+        }, 3000)
     }
 })
 
@@ -295,24 +385,29 @@ document.getElementById('searchInput')?.addEventListener('input', (e) => {
     })
 })
 
-document.getElementById('messageInput')?.addEventListener('input', function(e) {
-    const textarea = e.target
-    textarea.style.height = 'auto'
-    textarea.style.height = Math.min(textarea.scrollHeight, 100) + 'px'
-})
+function getUnreadStatus(chatId) {
+    const unreadStatus = JSON.parse(localStorage.getItem('unreadStatus') || '{}')
+    return unreadStatus[chatId] || false
+}
+
+function setUnreadStatus(chatId, status) {
+    const unreadStatus = JSON.parse(localStorage.getItem('unreadStatus') || '{}')
+    unreadStatus[chatId] = status
+    localStorage.setItem('unreadStatus', JSON.stringify(unreadStatus))
+}
 
 const debugPanel = document.createElement('div')
 debugPanel.id = 'debugPanel'
 debugPanel.style.cssText = `
-    position: fixed
-    bottom: 0
-    right: 0
-    background: rgba(0,0,0,0.8)
-    color: white
-    padding: 10px
-    font-size: 12px
-    z-index: 9999
-    display: none
+    position: fixed;
+    bottom: 0;
+    right: 0;
+    background: rgba(0,0,0,0.8);
+    color: white;
+    padding: 10px;
+    font-size: 12px;
+    z-index: 9999;
+    display: none;
 `
 
 document.body.appendChild(debugPanel)

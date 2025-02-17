@@ -23,6 +23,7 @@ interface MessageData {
     mediaUrl: string | null
     type: string
     fromMe: boolean
+    status?: 'sent' | 'delivered' | 'read'
 }
 
 const app = express()
@@ -120,10 +121,33 @@ client.on('message', async (message: Message) => {
         chatId: message.from,
         mediaUrl,
         type: message.type,
-        fromMe: message.fromMe
+        fromMe: message.fromMe,
+        status: message.fromMe ? 'sent' : undefined
     }
 
     io.emit('message', messageData)
+})
+
+client.on('message_ack', (message: Message, ack: number) => {
+    let status: 'sent' | 'delivered' | 'read'
+    switch(ack) {
+        case 1:
+            status = 'sent'
+            break
+        case 2:
+            status = 'delivered'
+            break
+        case 3:
+            status = 'read'
+            break
+        default:
+            status = 'sent'
+    }
+
+    io.emit('messageStatus', {
+        messageId: message.id._serialized,
+        status
+    })
 })
 
 const sendMessageHandler: RequestHandler = async (req, res) => {
@@ -156,7 +180,8 @@ const sendMessageHandler: RequestHandler = async (req, res) => {
             chatId: chatId,
             mediaUrl,
             type: media ? 'image' : 'text',
-            fromMe: true
+            fromMe: true,
+            status: 'sent'
         }
 
         io.emit('message', messageData)
@@ -202,7 +227,8 @@ const getChatHistoryHandler: RequestHandler = async (req, res) => {
                 chatId: msg.from,
                 mediaUrl,
                 type: msg.type,
-                fromMe: msg.fromMe
+                fromMe: msg.fromMe,
+                status: msg.fromMe ? (msg.ack >= 3 ? 'read' : msg.ack >= 2 ? 'delivered' : 'sent') : undefined
             }
         }))
 
@@ -237,6 +263,10 @@ io.on('connection', (socket) => {
         } catch (error) {
             console.error('Error marking message as read:', error)
         }
+    })
+
+    socket.on('typing', ({ chatId, isTyping }) => {
+        socket.broadcast.emit('userTyping', { chatId, isTyping })
     })
 })
 
