@@ -184,10 +184,10 @@ socket.on('message', (message) => {
     }
     updateChatList(message)
 
-    if (currentChat && message.chatId === currentChat.id) {
+    if (currentChat) {
         socket.emit('markMessageAsRead', {
             messageId: message.id,
-            chatId: message.chatId
+            chatId: `${currentChat.id}@c.us`
         })
         const container = document.getElementById('messagesContainer')
         if (container) {
@@ -312,6 +312,11 @@ function loadChatHistory(chatId) {
                 container.appendChild(messageElement)
             })
             container.scrollTop = container.scrollHeight
+
+            socket.emit('markMessageAsRead', {
+                messageId: history[0]?.id,
+                chatId: chatId
+            })
 
             setUnreadStatus(chatId, false)
             const chatItem = document.querySelector(`.chat-item[data-chat-id="${chatId}"]`)

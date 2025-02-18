@@ -255,9 +255,15 @@ io.on('connection', (socket) => {
 
     socket.on('markMessageAsRead', async ({ messageId, chatId }) => {
         try {
-            const chat = await client.getChatById(chatId).then(chat => chat.sendSeen())
-        } catch (error) {
+            const chat = await client.getChatById(chatId)
+            if (!chat) {
+                throw new Error(`Chat with ID ${chatId} not found`)
+            }
+            await chat.sendSeen()
+            io.emit('messageRead', { messageId, chatId })
+        } catch (error: any) {
             console.error('Error marking message as read:', error)
+            socket.emit('error', { message: 'Failed to mark message as read', error: error.message })
         }
     })
 
