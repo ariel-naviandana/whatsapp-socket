@@ -73,15 +73,18 @@ client.on('ready', async () => {
 
     const chats = await client.getChats()
     chatList = await Promise.all(chats.map(async (chat) => {
-        const lastMsg = chat.lastMessage || {}
+        const messages = await chat.fetchMessages({ limit: 1 })
+        const lastMsg = messages[0] || {}
         return {
             id: chat.id._serialized,
             name: chat.name,
             lastMessage: lastMsg.body || '',
-            timestamp: lastMsg.timestamp || Date.now(),
+            timestamp: lastMsg.timestamp ? lastMsg.timestamp * 1000 : Date.now(),
             unreadCount: chat.unreadCount
         }
     }))
+
+    chatList.sort((a, b) => b.timestamp - a.timestamp)
 
     io.emit('ready', {
         phoneNumber: connectedNumber,
@@ -125,7 +128,27 @@ client.on('message', async (message: Message) => {
         status: message.fromMe ? 'sent' : undefined
     }
 
+    const chatIndex = chatList.findIndex(chat => chat.id === message.from)
+    if (chatIndex !== -1) {
+        chatList[chatIndex].lastMessage = message.body
+        chatList[chatIndex].timestamp = timestamp.getTime()
+        if (!message.fromMe) {
+            chatList[chatIndex].unreadCount = (chatList[chatIndex].unreadCount || 0) + 1
+        }
+    } else {
+        chatList.push({
+            id: message.from,
+            name: senderName,
+            lastMessage: message.body,
+            timestamp: timestamp.getTime(),
+            unreadCount: message.fromMe ? 0 : 1
+        })
+    }
+
+    chatList.sort((a, b) => b.timestamp - a.timestamp)
+
     io.emit('message', messageData)
+    io.emit('updateChatList', chatList)
 })
 
 client.on('message_ack', (message: Message, ack: number) => {
@@ -252,6 +275,14 @@ io.on('connection', (socket) => {
     } else if (qrCode) {
         socket.emit('qr', qrCode)
     }
+
+    socket.on('markChatAsRead', ({ chatId }) => {
+        const chatIndex = chatList.findIndex(chat => chat.id === chatId)
+        if (chatIndex !== -1) {
+            chatList[chatIndex].unreadCount = 0
+            io.emit('updateChatList', chatList)
+        }
+    })
 
     socket.on('markMessageAsRead', async ({ messageId, chatId }) => {
         try {

@@ -169,6 +169,56 @@ function updateChatList(message) {
     }
 }
 
+socket.on('updateChatList', (updatedChatList) => {
+    const chatListElement = document.getElementById('chatList')
+    if (!chatListElement) return
+
+    chatListElement.innerHTML = ''
+
+    updatedChatList.forEach(chat => {
+        const chatItem = document.createElement('div')
+        chatItem.className = 'chat-item'
+        chatItem.dataset.chatId = chat.id
+
+        chatItem.innerHTML = `
+            <div class="chat-header-info">
+                <div class="chat-name">${chat.name}</div>
+                <div class="chat-time">${formatTimestamp(chat.timestamp)}</div>
+            </div>
+            <div class="chat-preview">
+                ${chat.unreadCount > 0 ? '<span class="unread-indicator">●</span>' : ''}
+                ${chat.lastMessage}
+            </div>
+        `
+
+        chatItem.onclick = () => {
+            currentChat = { id: chat.id, name: chat.name }
+            document.querySelectorAll('.chat-item').forEach(item =>
+                item.classList.remove('active')
+            )
+            chatItem.classList.add('active')
+
+            socket.emit('markChatAsRead', { chatId: chat.id })
+            const unreadIndicator = chatItem.querySelector('.unread-indicator')
+            if (unreadIndicator) {
+                unreadIndicator.remove()
+            }
+
+            const headerEl = document.getElementById('chatHeader')
+            if (headerEl) {
+                headerEl.innerHTML = `
+                    <h3>${chat.name}</h3>
+                    <div class="typing-status" id="typingStatus-${chat.id}"></div>
+                `
+            }
+
+            loadChatHistory(chat.id)
+        }
+
+        chatListElement.appendChild(chatItem)
+    })
+})
+
 socket.on('connect', () => {
     console.log('Connected to socket server')
 })
@@ -179,16 +229,19 @@ socket.on('disconnect', () => {
 
 socket.on('message', (message) => {
     messages.set(message.id, message)
+
     if (!message.fromMe) {
         setUnreadStatus(message.chatId, true)
     }
+
     updateChatList(message)
 
-    if (currentChat) {
+    if (currentChat && currentChat.id === message.chatId) {
         socket.emit('markMessageAsRead', {
             messageId: message.id,
             chatId: `${currentChat.id}@c.us`
         })
+
         const container = document.getElementById('messagesContainer')
         if (container) {
             const messageElement = createMessageElement(message, message.fromMe)
@@ -200,6 +253,14 @@ socket.on('message', (message) => {
     if (!message.fromMe && notificationSound) {
         notificationSound.play().catch(err => console.log('Error playing sound:', err))
     }
+
+    socket.emit('updateChatList', {
+        chatId: message.chatId,
+        lastMessage: message.message,
+        timestamp: message.timestamp,
+        senderName: message.senderName,
+        unreadCount: getUnreadStatus(message.chatId) ? 1 : 0
+    })
 })
 
 socket.on('messageStatus', ({ messageId, status }) => {
@@ -223,6 +284,8 @@ socket.on('ready', (data) => {
     if (connectedNumberEl) connectedNumberEl.textContent = `+${data.phoneNumber}`
 
     if (data.chats && Array.isArray(data.chats)) {
+        data.chats.sort((a, b) => b.timestamp - a.timestamp)
+
         data.chats.forEach(chat => {
             updateChatList({
                 chatId: chat.id,
