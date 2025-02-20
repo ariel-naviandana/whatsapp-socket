@@ -70,6 +70,13 @@ function createMessageElement(message, isOwnMessage) {
             replyImage.className = 'reply-image'
             replyImage.src = message.replyTo.mediaUrl
             replyContainer.appendChild(replyImage)
+        } else if (message.replyTo.mediaUrl && message.replyTo.type === 'document') {
+            const replyDocument = document.createElement('a')
+            replyDocument.className = 'reply-document'
+            replyDocument.href = message.replyTo.mediaUrl
+            replyDocument.textContent = message.replyTo.fileName || 'Download Document'
+            replyDocument.download = message.replyTo.fileName || 'document'
+            replyContainer.appendChild(replyDocument)
         }
 
         messageContent.appendChild(replyContainer)
@@ -135,6 +142,7 @@ function createMessageElement(message, isOwnMessage) {
         const replyContainer = document.getElementById('replyContainer')
         const replyMessageElement = document.getElementById('replyMessage')
         const replyImage = document.getElementById('replyImage')
+        const replyDocument = document.getElementById('replyDocument')
 
         if (replyContainer && replyMessageElement) {
             replyContainer.style.display = 'flex'
@@ -145,6 +153,16 @@ function createMessageElement(message, isOwnMessage) {
                     replyImage.src = message.mediaUrl
                 } else {
                     replyImage.style.display = 'none'
+                }
+            }
+            if (replyDocument) {
+                if (message.mediaUrl && message.type === 'document') {
+                    replyDocument.style.display = 'block'
+                    replyDocument.href = message.mediaUrl
+                    replyDocument.textContent = message.fileName || 'Download Document'
+                    replyDocument.download = message.fileName || 'document'
+                } else {
+                    replyDocument.style.display = 'none'
                 }
             }
         }

@@ -109,10 +109,12 @@ client.on('message', async (message: Message) => {
     const timestamp = new Date(message.timestamp * 1000)
 
     let mediaUrl = null
+    let fileName = null
     if (message.hasMedia) {
         try {
             const media = await message.downloadMedia()
             mediaUrl = `data:${media.mimetype};base64,${media.data}`
+            fileName = media.filename || 'Download Document'
         } catch (error) {
             logger.error('Error downloading media:', error)
         }
@@ -137,6 +139,7 @@ client.on('message', async (message: Message) => {
         isRead: false,
         chatId: message.from,
         mediaUrl,
+        fileName,
         type: message.type,
         fromMe: message.fromMe,
         status: message.fromMe ? 'sent' : undefined,
@@ -172,10 +175,12 @@ const getQuotedMessageData = async (message: Message): Promise<MessageData> => {
     const timestamp = new Date(quotedMsg.timestamp * 1000)
 
     let mediaUrl = null
+    let fileName = null
     if (quotedMsg.hasMedia) {
         try {
             const media = await quotedMsg.downloadMedia()
             mediaUrl = `data:${media.mimetype};base64,${media.data}`
+            fileName = media.filename || 'Download Document'
         } catch (error) {
             logger.error('Error downloading media:', error)
         }
@@ -198,6 +203,7 @@ const getQuotedMessageData = async (message: Message): Promise<MessageData> => {
         isRead: false,
         chatId: quotedMsg.from,
         mediaUrl,
+        fileName,
         type: quotedMsg.type,
         fromMe: quotedMsg.fromMe,
         status: quotedMsg.fromMe ? 'sent' : undefined
@@ -284,10 +290,12 @@ const getChatHistoryHandler: RequestHandler = async (req, res) => {
 
         const formattedMessages = await Promise.all(messages.map(async (msg) => {
             let mediaUrl = null
+            let fileName = null
             if (msg.hasMedia) {
                 try {
                     const media = await msg.downloadMedia()
                     mediaUrl = `data:${media.mimetype};base64,${media.data}`
+                    fileName = media.filename || 'Download Document'
                 } catch (error) {
                     logger.error('Error downloading media:', error)
                 }
@@ -312,6 +320,7 @@ const getChatHistoryHandler: RequestHandler = async (req, res) => {
                 isRead: msg.isStatus,
                 chatId: msg.from,
                 mediaUrl,
+                fileName,
                 type: msg.hasMedia ? (msg.type === 'image' ? 'image' : 'document') : 'text',
                 fromMe: msg.fromMe,
                 status: msg.fromMe ? (msg.ack >= 3 ? 'read' : msg.ack >= 2 ? 'delivered' : 'sent') : undefined,
