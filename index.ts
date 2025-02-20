@@ -6,6 +6,7 @@ import qrcode from 'qrcode-terminal'
 import path from 'path'
 import moment from 'moment'
 import multer from 'multer'
+import log4js from 'log4js'
 
 interface SendMessageBody {
     chatId: string
@@ -26,6 +27,13 @@ interface MessageData {
     fromMe: boolean
     status?: 'sent' | 'delivered' | 'read'
 }
+
+log4js.configure({
+    appenders: { cheese: { type: 'file', filename: 'cheese.log' } },
+    categories: { default: { appenders: ['cheese'], level: 'debug' } }
+})
+
+const logger = log4js.getLogger('cheese')
 
 const app = express()
 const server = http.createServer(app)
@@ -65,6 +73,7 @@ client.on('qr', (qr) => {
     qrCode = qr
     qrcode.generate(qr, { small: true })
     io.emit('qr', qr)
+    logger.info('QR code received and emitted')
 })
 
 client.on('ready', async () => {
@@ -92,6 +101,7 @@ client.on('ready', async () => {
         userName: userName,
         chats: chatList
     })
+    logger.info('Client is ready')
 })
 
 client.on('message', async (message: Message) => {
@@ -103,7 +113,7 @@ client.on('message', async (message: Message) => {
             const media = await message.downloadMedia()
             mediaUrl = `data:${media.mimetype};base64,${media.data}`
         } catch (error) {
-            console.error('Error downloading media:', error)
+            logger.error('Error downloading media:', error)
         }
     }
 
@@ -112,7 +122,7 @@ client.on('message', async (message: Message) => {
         const contact = await message.getContact()
         senderName = contact.pushname || contact.name || senderName
     } catch (error) {
-        console.error('Error getting contact info:', error)
+        logger.error('Error getting contact info:', error)
     }
 
     const messageData: MessageData = {
@@ -150,6 +160,7 @@ client.on('message', async (message: Message) => {
 
     io.emit('message', messageData)
     io.emit('updateChatList', chatList)
+    logger.info('New message received and processed')
 })
 
 client.on('message_ack', (message: Message, ack: number) => {
@@ -172,6 +183,7 @@ client.on('message_ack', (message: Message, ack: number) => {
         messageId: message.id._serialized,
         status
     })
+    logger.info(`Message ${message.id._serialized} status updated to ${status}`)
 })
 
 const sendMessageHandler: RequestHandler = async (req, res) => {
@@ -213,8 +225,9 @@ const sendMessageHandler: RequestHandler = async (req, res) => {
 
         io.emit('message', messageData)
         res.json({ success: true })
+        logger.info(`Message sent to ${chatId}`)
     } catch (error) {
-        console.error('Error sending message:', error)
+        logger.error('Error sending message:', error)
         res.status(500).json({ error: 'Failed to send message' })
     }
 }
@@ -232,7 +245,7 @@ const getChatHistoryHandler: RequestHandler = async (req, res) => {
                     const media = await msg.downloadMedia()
                     mediaUrl = `data:${media.mimetype};base64,${media.data}`
                 } catch (error) {
-                    console.error('Error downloading media:', error)
+                    logger.error('Error downloading media:', error)
                 }
             }
 
@@ -241,7 +254,7 @@ const getChatHistoryHandler: RequestHandler = async (req, res) => {
                 const contact = await msg.getContact()
                 senderName = contact.pushname || contact.name || senderName
             } catch (error) {
-                console.error('Error getting contact info:', error)
+                logger.error('Error getting contact info:', error)
             }
 
             return {
@@ -260,8 +273,9 @@ const getChatHistoryHandler: RequestHandler = async (req, res) => {
         }))
 
         res.json(formattedMessages)
+        logger.info(`Chat history for ${chatId} fetched`)
     } catch (error) {
-        console.error('Error fetching chat history:', error)
+        logger.error('Error fetching chat history:', error)
         res.status(500).json({ error: 'Failed to fetch chat history' })
     }
 }
@@ -297,7 +311,7 @@ io.on('connection', (socket) => {
             await chat.sendSeen()
             io.emit('messageRead', { messageId, chatId })
         } catch (error: any) {
-            console.error('Error marking message as read:', error)
+            logger.error('Error marking message as read:', error)
             socket.emit('error', { message: 'Failed to mark message as read', error: error.message })
         }
     })
@@ -306,9 +320,9 @@ io.on('connection', (socket) => {
         try {
             if (isTyping)
                 await client.getChatById(chatId).then(chat => chat.sendStateTyping())
-             socket.broadcast.emit('userTyping', { chatId, isTyping })
+            socket.broadcast.emit('userTyping', { chatId, isTyping })
         } catch (error) {
-            console.error('Error handling typing status:', error)
+            logger.error('Error handling typing status:', error)
         }
     })
 })
@@ -319,17 +333,18 @@ client.on('disconnected', (reason) => {
     userName = null
     io.emit('disconnected', reason)
     client.initialize()
+    logger.warn('Client disconnected, reinitializing...')
 })
 
 io.on('connect_error', (error) => {
-    console.error('Socket connection error:', error)
+    logger.error('Socket connection error:', error)
 })
 
 client.initialize()
 
 const PORT = process.env.PORT || 3001
 server.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`)
+    logger.info(`Server is running on port ${PORT}`)
 })
 
 process.on('SIGINT', async () => {
@@ -338,7 +353,7 @@ process.on('SIGINT', async () => {
         server.close()
         process.exit(0)
     } catch (err) {
-        console.error('Error during shutdown:', err)
+        logger.error('Error during shutdown:', err)
         process.exit(1)
     }
 })
