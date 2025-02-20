@@ -202,7 +202,7 @@ const sendMessageHandler: RequestHandler = async (req, res) => {
             isRead: false,
             chatId: chatId,
             mediaUrl,
-            type: media ? 'image' : 'text',
+            type: media ? (media.mimetype.startsWith('image') ? 'image' : 'document') : 'text',
             fromMe: true,
             status: 'sent'
         }
@@ -249,7 +249,7 @@ const getChatHistoryHandler: RequestHandler = async (req, res) => {
                 isRead: msg.isStatus,
                 chatId: msg.from,
                 mediaUrl,
-                type: msg.type,
+                type: msg.hasMedia ? (msg.type === 'image' ? 'image' : 'document') : 'text',
                 fromMe: msg.fromMe,
                 status: msg.fromMe ? (msg.ack >= 3 ? 'read' : msg.ack >= 2 ? 'delivered' : 'sent') : undefined
             }

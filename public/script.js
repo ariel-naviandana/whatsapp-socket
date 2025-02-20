@@ -71,6 +71,12 @@ function createMessageElement(message, isOwnMessage) {
             source.src = message.mediaUrl
             video.appendChild(source)
             mediaContainer.appendChild(video)
+        } else if (message.type === 'document') {
+            const documentLink = document.createElement('a')
+            documentLink.href = message.mediaUrl
+            documentLink.textContent = 'Download Document'
+            documentLink.download = true
+            mediaContainer.appendChild(documentLink)
         }
 
         messageContent.appendChild(mediaContainer)
@@ -133,6 +139,13 @@ function updateChatList(message) {
     const senderName = message.senderName || message.sender.split('@')[0]
     const isUnread = getUnreadStatus(message.chatId) && (!currentChat || currentChat.id !== message.chatId)
 
+    let previewContent = message.message
+    if (message.type === 'image') {
+        previewContent = '📷 Image'
+    } else if (message.type === 'document') {
+        previewContent = '📄 Document'
+    }
+
     chatItem.innerHTML = `
         <div class="chat-header-info">
             <div class="chat-name">${senderName}</div>
@@ -140,7 +153,7 @@ function updateChatList(message) {
         </div>
         <div class="chat-preview">
             ${isUnread ? '<span class="unread-indicator">●</span>' : ''}
-            ${message.message}
+            ${previewContent}
         </div>
     `
 
