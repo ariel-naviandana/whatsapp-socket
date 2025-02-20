@@ -301,6 +301,33 @@
             outline: none;
         }
 
+        .reply-container {
+            display: none;
+            flex-direction: column;
+            width: 100%;
+            background-color: #ebebeb;
+            border-radius: 8px 8px 0 0;
+            padding: 8px;
+            margin-bottom: 8px;
+        }
+
+        .reply-header {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .reply-message {
+            font-size: 14px;
+            color: #111b21;
+        }
+
+        .reply-image {
+            max-width: 100px;
+            max-height: 100px;
+            border-radius: 4px;
+            margin-top: 8px;
+        }
+
         .attach-button,
         .send-button {
             background: none;
@@ -403,6 +430,15 @@
 
         <div class="chat-footer">
             <div class="attachment-preview" id="attachmentPreview" style="display: none;"></div>
+            <div class="reply-container" id="replyContainer">
+                <div class="reply-header">
+                    <span class="reply-message" id="replyMessage"></span>
+                    <button id="cancelReplyButton" class="attach-button">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <img id="replyImage" class="reply-image" style="display: none;">
+            </div>
             <div class="message-input-container">
                 <button class="attach-button" id="attachButton">
                     <i class="fas fa-paperclip"></i>

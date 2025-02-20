@@ -26,6 +26,7 @@ interface MessageData {
     type: string
     fromMe: boolean
     status?: 'sent' | 'delivered' | 'read'
+    replyTo?: MessageData | null
 }
 
 log4js.configure({
@@ -125,6 +126,8 @@ client.on('message', async (message: Message) => {
         logger.error('Error getting contact info:', error)
     }
 
+    const replyTo = message.hasQuotedMsg ? await getQuotedMessageData(message) : null
+
     const messageData: MessageData = {
         id: message.id._serialized,
         sender: message.from,
@@ -136,7 +139,8 @@ client.on('message', async (message: Message) => {
         mediaUrl,
         type: message.type,
         fromMe: message.fromMe,
-        status: message.fromMe ? 'sent' : undefined
+        status: message.fromMe ? 'sent' : undefined,
+        replyTo
     }
 
     const chatIndex = chatList.findIndex(chat => chat.id === message.from)
@@ -162,6 +166,43 @@ client.on('message', async (message: Message) => {
     io.emit('updateChatList', chatList)
     logger.info('New message received and processed')
 })
+
+const getQuotedMessageData = async (message: Message): Promise<MessageData> => {
+    const quotedMsg = await message.getQuotedMessage()
+    const timestamp = new Date(quotedMsg.timestamp * 1000)
+
+    let mediaUrl = null
+    if (quotedMsg.hasMedia) {
+        try {
+            const media = await quotedMsg.downloadMedia()
+            mediaUrl = `data:${media.mimetype};base64,${media.data}`
+        } catch (error) {
+            logger.error('Error downloading media:', error)
+        }
+    }
+
+    let senderName = quotedMsg.from.split('@')[0]
+    try {
+        const contact = await quotedMsg.getContact()
+        senderName = contact.pushname || contact.name || senderName
+    } catch (error) {
+        logger.error('Error getting contact info:', error)
+    }
+
+    return {
+        id: quotedMsg.id._serialized,
+        sender: quotedMsg.from,
+        senderName: senderName,
+        message: quotedMsg.body,
+        timestamp: timestamp.toISOString(),
+        isRead: false,
+        chatId: quotedMsg.from,
+        mediaUrl,
+        type: quotedMsg.type,
+        fromMe: quotedMsg.fromMe,
+        status: quotedMsg.fromMe ? 'sent' : undefined
+    }
+}
 
 client.on('message_ack', (message: Message, ack: number) => {
     let status: 'sent' | 'delivered' | 'read'
@@ -190,6 +231,7 @@ const sendMessageHandler: RequestHandler = async (req, res) => {
     try {
         const { chatId, message } = req.body as SendMessageBody
         const media = req.file
+        const replyTo = req.body.replyTo ? JSON.parse(req.body.replyTo) : null
 
         let sentMessage
         let mediaUrl = null
@@ -205,7 +247,8 @@ const sendMessageHandler: RequestHandler = async (req, res) => {
             mediaUrl = `data:${media.mimetype};base64,${media.buffer.toString('base64')}`
             fileName = media.originalname
         } else {
-            sentMessage = await client.sendMessage(chatId, message)
+            const options = replyTo ? { quotedMessageId: replyTo.id } : {}
+            sentMessage = await client.sendMessage(chatId, message, options)
         }
 
         const messageData: MessageData = {
@@ -220,7 +263,8 @@ const sendMessageHandler: RequestHandler = async (req, res) => {
             fileName,
             type: media ? (media.mimetype.startsWith('image') ? 'image' : 'document') : 'text',
             fromMe: true,
-            status: 'sent'
+            status: 'sent',
+            replyTo
         }
 
         io.emit('message', messageData)
@@ -257,6 +301,8 @@ const getChatHistoryHandler: RequestHandler = async (req, res) => {
                 logger.error('Error getting contact info:', error)
             }
 
+            const replyTo = msg.hasQuotedMsg ? await getQuotedMessageData(msg) : null
+
             return {
                 id: msg.id._serialized,
                 sender: msg.from,
@@ -268,7 +314,8 @@ const getChatHistoryHandler: RequestHandler = async (req, res) => {
                 mediaUrl,
                 type: msg.hasMedia ? (msg.type === 'image' ? 'image' : 'document') : 'text',
                 fromMe: msg.fromMe,
-                status: msg.fromMe ? (msg.ack >= 3 ? 'read' : msg.ack >= 2 ? 'delivered' : 'sent') : undefined
+                status: msg.fromMe ? (msg.ack >= 3 ? 'read' : msg.ack >= 2 ? 'delivered' : 'sent') : undefined,
+                replyTo
             }
         }))
 

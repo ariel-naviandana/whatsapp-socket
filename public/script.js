@@ -39,6 +39,8 @@ function formatTimestamp(timestamp) {
     }
 }
 
+let replyMessage = null
+
 function createMessageElement(message, isOwnMessage) {
     const messageElement = document.createElement('div')
     messageElement.className = `message ${isOwnMessage ? 'sent' : 'received'}`
@@ -52,6 +54,25 @@ function createMessageElement(message, isOwnMessage) {
         senderName.className = 'message-sender'
         senderName.textContent = message.senderName
         messageContent.appendChild(senderName)
+    }
+
+    if (message.replyTo) {
+        const replyContainer = document.createElement('div')
+        replyContainer.className = 'reply-container'
+
+        const replyMessageElement = document.createElement('div')
+        replyMessageElement.className = 'reply-message'
+        replyMessageElement.textContent = message.replyTo.message
+        replyContainer.appendChild(replyMessageElement)
+
+        if (message.replyTo.mediaUrl && message.replyTo.type === 'image') {
+            const replyImage = document.createElement('img')
+            replyImage.className = 'reply-image'
+            replyImage.src = message.replyTo.mediaUrl
+            replyContainer.appendChild(replyImage)
+        }
+
+        messageContent.appendChild(replyContainer)
     }
 
     if (message.mediaUrl) {
@@ -108,6 +129,27 @@ function createMessageElement(message, isOwnMessage) {
 
     messageContent.appendChild(messageFooter)
     messageElement.appendChild(messageContent)
+
+    messageElement.addEventListener('click', () => {
+        replyMessage = message
+        const replyContainer = document.getElementById('replyContainer')
+        const replyMessageElement = document.getElementById('replyMessage')
+        const replyImage = document.getElementById('replyImage')
+
+        if (replyContainer && replyMessageElement) {
+            replyContainer.style.display = 'flex'
+            replyMessageElement.textContent = message.message
+            if (replyImage) {
+                if (message.mediaUrl && message.type === 'image') {
+                    replyImage.style.display = 'block'
+                    replyImage.src = message.mediaUrl
+                } else {
+                    replyImage.style.display = 'none'
+                }
+            }
+        }
+    })
+
     return messageElement
 }
 
@@ -363,6 +405,9 @@ async function sendMessage() {
     if (file) {
         formData.append('media', file)
     }
+    if (replyMessage) {
+        formData.append('replyTo', JSON.stringify(replyMessage))
+    }
 
     try {
         const response = await fetch('/api/send-message', {
@@ -380,6 +425,11 @@ async function sendMessage() {
             if (attachmentPreview) {
                 attachmentPreview.style.display = 'none'
                 attachmentPreview.innerHTML = ''
+            }
+            replyMessage = null
+            const replyContainer = document.getElementById('replyContainer')
+            if (replyContainer) {
+                replyContainer.style.display = 'none'
             }
         } else {
             throw new Error('Failed to send message')
@@ -459,6 +509,14 @@ document.getElementById('messageInput')?.addEventListener('input', (e) => {
 })
 
 document.getElementById('sendButton')?.addEventListener('click', sendMessage)
+
+document.getElementById('cancelReplyButton')?.addEventListener('click', () => {
+    replyMessage = null
+    const replyContainer = document.getElementById('replyContainer')
+    if (replyContainer) {
+        replyContainer.style.display = 'none'
+    }
+})
 
 document.getElementById('attachButton')?.addEventListener('click', () => {
     document.getElementById('fileInput')?.click()
