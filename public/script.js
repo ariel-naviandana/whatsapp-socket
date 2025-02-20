@@ -74,8 +74,8 @@ function createMessageElement(message, isOwnMessage) {
         } else if (message.type === 'document') {
             const documentLink = document.createElement('a')
             documentLink.href = message.mediaUrl
-            documentLink.textContent = 'Download Document'
-            documentLink.download = true
+            documentLink.textContent = message.fileName || 'Download Document'
+            documentLink.download = message.fileName || 'document'
             mediaContainer.appendChild(documentLink)
         }
 

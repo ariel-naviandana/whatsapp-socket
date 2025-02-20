@@ -20,7 +20,8 @@ interface MessageData {
     timestamp: string
     isRead: boolean
     chatId: string
-    mediaUrl: string | null
+    mediaUrl?: string | null
+    fileName?: string | null
     type: string
     fromMe: boolean
     status?: 'sent' | 'delivered' | 'read'
@@ -180,6 +181,7 @@ const sendMessageHandler: RequestHandler = async (req, res) => {
 
         let sentMessage
         let mediaUrl = null
+        let fileName = null
 
         if (media) {
             const messageMedia = new MessageMedia(
@@ -189,6 +191,7 @@ const sendMessageHandler: RequestHandler = async (req, res) => {
             )
             sentMessage = await client.sendMessage(chatId, messageMedia, { caption: message })
             mediaUrl = `data:${media.mimetype};base64,${media.buffer.toString('base64')}`
+            fileName = media.originalname
         } else {
             sentMessage = await client.sendMessage(chatId, message)
         }
@@ -202,6 +205,7 @@ const sendMessageHandler: RequestHandler = async (req, res) => {
             isRead: false,
             chatId: chatId,
             mediaUrl,
+            fileName,
             type: media ? (media.mimetype.startsWith('image') ? 'image' : 'document') : 'text',
             fromMe: true,
             status: 'sent'
