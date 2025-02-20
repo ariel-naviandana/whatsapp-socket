@@ -199,11 +199,15 @@ function updateChatList(message) {
     const senderName = message.senderName || message.sender.split('@')[0]
     const isUnread = getUnreadStatus(message.chatId) && (!currentChat || currentChat.id !== message.chatId)
 
-    let previewContent = message.message
+    let previewContent
     if (message.type === 'image') {
         previewContent = '📷 Image'
     } else if (message.type === 'document') {
         previewContent = '📄 Document'
+    } else if (message.mediaUrl) {
+        previewContent = message.mediaUrl.includes('image') ? '📷 Image' : '📄 Document'
+    } else {
+        previewContent = message.message || ''
     }
 
     chatItem.innerHTML = `
@@ -383,7 +387,8 @@ socket.on('ready', (data) => {
                 message: chat.lastMessage || '',
                 timestamp: chat.timestamp,
                 sender: chat.id,
-                unreadCount: chat.unreadCount
+                unreadCount: chat.unreadCount,
+                type: chat.type
             })
         })
     }

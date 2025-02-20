@@ -91,7 +91,10 @@ client.on('ready', async () => {
             name: chat.name,
             lastMessage: lastMsg.body || '',
             timestamp: lastMsg.timestamp ? lastMsg.timestamp * 1000 : Date.now(),
-            unreadCount: chat.unreadCount
+            unreadCount: chat.unreadCount,
+            type: lastMsg.hasMedia ?
+                (lastMsg.type === 'image' ? 'image' : 'document')
+                : 'text'
         }
     }))
 
