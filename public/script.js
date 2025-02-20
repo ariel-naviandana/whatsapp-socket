@@ -108,12 +108,12 @@ function createMessageElement(message, isOwnMessage) {
         }
 
         messageContent.appendChild(mediaContainer)
+    } else {
+        const messageText = document.createElement('div')
+        messageText.className = 'message-text'
+        messageText.textContent = message.message
+        messageContent.appendChild(messageText)
     }
-
-    const messageText = document.createElement('div')
-    messageText.className = 'message-text'
-    messageText.textContent = message.message
-    messageContent.appendChild(messageText)
 
     const messageFooter = document.createElement('div')
     messageFooter.className = 'message-footer'
