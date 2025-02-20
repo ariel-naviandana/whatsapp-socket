@@ -108,12 +108,12 @@ function createMessageElement(message, isOwnMessage) {
         }
 
         messageContent.appendChild(mediaContainer)
-    } else {
-        const messageText = document.createElement('div')
-        messageText.className = 'message-text'
-        messageText.textContent = message.message
-        messageContent.appendChild(messageText)
     }
+
+    const messageText = document.createElement('div')
+    messageText.className = 'message-text'
+    messageText.textContent = message.message
+    messageContent.appendChild(messageText)
 
     const messageFooter = document.createElement('div')
     messageFooter.className = 'message-footer'
@@ -257,6 +257,15 @@ socket.on('updateChatList', (updatedChatList) => {
         chatItem.className = 'chat-item'
         chatItem.dataset.chatId = chat.id
 
+        let previewContent
+        if (chat.type === 'image') {
+            previewContent = '📷 Image'
+        } else if (chat.type === 'document') {
+            previewContent = '📄 Document'
+        } else {
+            previewContent = chat.lastMessage
+        }
+
         chatItem.innerHTML = `
             <div class="chat-header-info">
                 <div class="chat-name">${chat.name}</div>
@@ -264,7 +273,7 @@ socket.on('updateChatList', (updatedChatList) => {
             </div>
             <div class="chat-preview">
                 ${chat.unreadCount > 0 ? '<span class="unread-indicator">●</span>' : ''}
-                ${chat.lastMessage}
+                ${previewContent}
             </div>
         `
 

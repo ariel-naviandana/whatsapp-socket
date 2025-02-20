@@ -153,6 +153,9 @@ client.on('message', async (message: Message) => {
     if (chatIndex !== -1) {
         chatList[chatIndex].lastMessage = message.body
         chatList[chatIndex].timestamp = timestamp.getTime()
+        chatList[chatIndex].type = message.hasMedia ?
+            (message.type === 'image' ? 'image' : 'document')
+            : 'text'
         if (!message.fromMe) {
             chatList[chatIndex].unreadCount = (chatList[chatIndex].unreadCount || 0) + 1
         }
@@ -162,7 +165,10 @@ client.on('message', async (message: Message) => {
             name: senderName,
             lastMessage: message.body,
             timestamp: timestamp.getTime(),
-            unreadCount: message.fromMe ? 0 : 1
+            unreadCount: message.fromMe ? 0 : 1,
+            type: message.hasMedia ?
+                (message.type === 'image' ? 'image' : 'document')
+                : 'text'
         })
     }
 
