@@ -238,6 +238,33 @@
             display: flex;
             align-items: center;
             gap: 8px;
+            flex-direction: column;
+        }
+
+        .attachment-preview {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .attachment-preview img,
+        .attachment-preview video {
+            max-width: 100px;
+            border-radius: 4px;
+        }
+
+        .attachment-preview a {
+            text-decoration: none;
+            color: #007bff;
+            font-size: 14px;
+        }
+
+        .message-input-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            width: 100%;
         }
 
         .message-input {
@@ -355,19 +382,22 @@
         <div class="messages-container" id="messagesContainer"></div>
 
         <div class="chat-footer">
-            <button class="attach-button" id="attachButton">
-                <i class="fas fa-paperclip"></i>
-            </button>
-            <input type="file" id="fileInput" style="display: none" accept="image/*,video/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
-            <textarea
-                    class="message-input"
-                    id="messageInput"
-                    placeholder="Type a message"
-                    rows="1"
-            ></textarea>
-            <button class="send-button" id="sendButton">
-                <i class="fas fa-paper-plane"></i>
-            </button>
+            <div class="attachment-preview" id="attachmentPreview" style="display: none;"></div>
+            <div class="message-input-container">
+                <button class="attach-button" id="attachButton">
+                    <i class="fas fa-paperclip"></i>
+                </button>
+                <input type="file" id="fileInput" style="display: none" accept="image/*,video/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
+                <textarea
+                        class="message-input"
+                        id="messageInput"
+                        placeholder="Type a message"
+                        rows="1"
+                ></textarea>
+                <button class="send-button" id="sendButton">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </div>
         </div>
     </div>
 </div>

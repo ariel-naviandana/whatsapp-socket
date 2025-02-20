@@ -359,6 +359,11 @@ async function sendMessage() {
             if (fileInput) fileInput.value = ''
             messageInput.placeholder = 'Type a message'
             messageInput.style.height = 'auto'
+            const attachmentPreview = document.getElementById('attachmentPreview')
+            if (attachmentPreview) {
+                attachmentPreview.style.display = 'none'
+                attachmentPreview.innerHTML = ''
+            }
         } else {
             throw new Error('Failed to send message')
         }
@@ -444,9 +449,30 @@ document.getElementById('attachButton')?.addEventListener('click', () => {
 
 document.getElementById('fileInput')?.addEventListener('change', (e) => {
     const input = e.target
-    const messageInput = document.getElementById('messageInput')
-    if (input.files?.[0] && messageInput) {
-        messageInput.placeholder = `Attached: ${input.files[0].name}`
+    const attachmentPreview = document.getElementById('attachmentPreview')
+    if (input.files?.[0] && attachmentPreview) {
+        attachmentPreview.style.display = 'flex'
+        attachmentPreview.innerHTML = ''
+
+        const file = input.files[0]
+        if (file.type.startsWith('image/')) {
+            const img = document.createElement('img')
+            img.src = URL.createObjectURL(file)
+            img.alt = 'Image Preview'
+            attachmentPreview.appendChild(img)
+        } else if (file.type.startsWith('video/')) {
+            const video = document.createElement('video')
+            video.controls = true
+            const source = document.createElement('source')
+            source.src = URL.createObjectURL(file)
+            video.appendChild(source)
+            attachmentPreview.appendChild(video)
+        } else {
+            const documentLink = document.createElement('a')
+            documentLink.href = URL.createObjectURL(file)
+            documentLink.textContent = file.name
+            attachmentPreview.appendChild(documentLink)
+        }
     }
 })
 
