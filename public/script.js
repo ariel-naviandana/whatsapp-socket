@@ -236,8 +236,25 @@ socket.on('connect', () => {
     console.log('Connected to socket server')
 })
 
-socket.on('disconnect', () => {
-    console.log('Disconnected from socket server')
+socket.on('disconnected', (reason) => {
+    const qrCodeContainer = document.getElementById('qrCodeContainer')
+    const messagesContainer = document.getElementById('messagesContainer')
+    const chatList = document.getElementById('chatList')
+    const chatHeader = document.getElementById('chatHeader')
+
+    if (qrCodeContainer) {
+        qrCodeContainer.style.display = 'block'
+    }
+    if (messagesContainer) {
+        messagesContainer.innerHTML = ''
+    }
+    if (chatList) {
+        chatList.innerHTML = ''
+    }
+    if (chatHeader) {
+        chatHeader.innerHTML = '<h3>Select a chat to start messaging</h3>'
+    }
+    console.log('Disconnected: ', reason)
 })
 
 socket.on('message', (message) => {
@@ -490,6 +507,21 @@ document.getElementById('searchInput')?.addEventListener('input', (e) => {
             item.style.display = 'none'
         }
     })
+})
+
+document.getElementById('logoutButton')?.addEventListener('click', async () => {
+    try {
+        const response = await fetch('/api/logout', { method: 'POST' })
+        const result = await response.json()
+        if (result.success) {
+            console.log('Logged out successfully')
+        } else {
+            throw new Error('Failed to logout')
+        }
+    } catch (error) {
+        console.error('Error logging out:', error)
+        alert('Failed to logout')
+    }
 })
 
 function getUnreadStatus(chatId) {

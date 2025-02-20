@@ -280,8 +280,26 @@ const getChatHistoryHandler: RequestHandler = async (req, res) => {
     }
 }
 
+const logoutHandler: RequestHandler = async (req, res) => {
+    try {
+        await client.logout()
+        qrCode = null
+        connectedNumber = null
+        userName = null
+        chatList = []
+        client.initialize()
+        io.emit('disconnected', 'User logged out')
+        logger.info('User logged out and client reinitialized')
+        res.json({ success: true })
+    } catch (error) {
+        logger.error('Error during logout:', error)
+        res.status(500).json({ error: 'Failed to logout' })
+    }
+}
+
 app.post('/api/send-message', upload.single('media'), sendMessageHandler)
 app.get('/api/chat-history/:chatId', getChatHistoryHandler)
+app.post('/api/logout', logoutHandler)
 
 io.on('connection', (socket) => {
     if (connectedNumber && userName) {

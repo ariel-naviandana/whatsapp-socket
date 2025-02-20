@@ -38,6 +38,14 @@
             padding: 15px;
             background-color: #008069;
             color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .user-details {
+            display: flex;
+            flex-direction: column;
         }
 
         .user-name {
@@ -48,6 +56,15 @@
         .user-number {
             font-size: 13px;
             opacity: 0.9;
+        }
+
+        .logout-button {
+            background: none;
+            border: none;
+            color: white;
+            cursor: pointer;
+            font-size: 16px;
+            padding: 0;
         }
 
         .search-container {
@@ -363,8 +380,11 @@
 <div class="container">
     <div class="sidebar">
         <div class="user-info">
-            <div id="userName" class="user-name"></div>
-            <div id="connectedNumber" class="user-number"></div>
+            <div class="user-details">
+                <div id="userName" class="user-name"></div>
+                <div id="connectedNumber" class="user-number"></div>
+            </div>
+            <button id="logoutButton" class="logout-button">Logout</button>
         </div>
         <div class="search-container">
             <input type="text" class="search-input" placeholder="Search or start new chat" id="searchInput">
