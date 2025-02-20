@@ -440,9 +440,13 @@ async function sendMessage() {
             messageInput.placeholder = 'Type a message'
             messageInput.style.height = 'auto'
             const attachmentPreview = document.getElementById('attachmentPreview')
+            const attachmentContainer = document.getElementById('attachmentContainer')
             if (attachmentPreview) {
                 attachmentPreview.style.display = 'none'
                 attachmentPreview.innerHTML = ''
+            }
+            if (attachmentContainer) {
+                attachmentContainer.style.display = 'none'
             }
             replyMessage = null
             const replyContainer = document.getElementById('replyContainer')
@@ -540,14 +544,37 @@ document.getElementById('attachButton')?.addEventListener('click', () => {
     document.getElementById('fileInput')?.click()
 })
 
+document.getElementById('cancelAttachmentButton')?.addEventListener('click', () => {
+    const attachmentContainer = document.getElementById('attachmentContainer')
+    const attachmentPreview = document.getElementById('attachmentPreview')
+    const fileInput = document.getElementById('fileInput')
+
+    if (attachmentContainer) {
+        attachmentContainer.style.display = 'none'
+    }
+    if (attachmentPreview) {
+        attachmentPreview.innerHTML = ''
+        attachmentPreview.style.display = 'none'
+    }
+    if (fileInput) {
+        fileInput.value = ''
+    }
+})
+
 document.getElementById('fileInput')?.addEventListener('change', (e) => {
     const input = e.target
+    const attachmentContainer = document.getElementById('attachmentContainer')
+    const attachmentName = document.getElementById('attachmentName')
     const attachmentPreview = document.getElementById('attachmentPreview')
-    if (input.files?.[0] && attachmentPreview) {
+
+    if (input.files?.[0] && attachmentContainer && attachmentName && attachmentPreview) {
+        attachmentContainer.style.display = 'flex'
         attachmentPreview.style.display = 'flex'
         attachmentPreview.innerHTML = ''
 
         const file = input.files[0]
+        attachmentName.textContent = file.name
+
         if (file.type.startsWith('image/')) {
             const img = document.createElement('img')
             img.src = URL.createObjectURL(file)
