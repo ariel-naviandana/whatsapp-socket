@@ -1,7 +1,7 @@
-import express, { RequestHandler } from 'express'
-import { Server } from 'socket.io'
+import express, {RequestHandler} from 'express'
+import {Server} from 'socket.io'
 import http from 'http'
-import { Client, LocalAuth, Message, MessageMedia } from 'whatsapp-web.js'
+import {Client, LocalAuth, Message, MessageMedia, MessageTypes} from 'whatsapp-web.js'
 import qrcode from 'qrcode-terminal'
 import path from 'path'
 import moment from 'moment'
@@ -17,7 +17,7 @@ interface MessageData {
     id: string
     sender: string
     senderName: string
-    message: string
+    message: string | null
     timestamp: string
     isRead: boolean
     chatId: string
@@ -179,46 +179,6 @@ client.on('message', async (message: Message) => {
     logger.info('New message received and processed')
 })
 
-const getQuotedMessageData = async (message: Message): Promise<MessageData> => {
-    const quotedMsg = await message.getQuotedMessage()
-    const timestamp = new Date(quotedMsg.timestamp * 1000)
-
-    let mediaUrl = null
-    let fileName = null
-    if (quotedMsg.hasMedia) {
-        try {
-            const media = await quotedMsg.downloadMedia()
-            mediaUrl = `data:${media.mimetype};base64,${media.data}`
-            fileName = media.filename || 'Download Document'
-        } catch (error) {
-            logger.error('Error downloading media:', error)
-        }
-    }
-
-    let senderName = quotedMsg.from.split('@')[0]
-    try {
-        const contact = await quotedMsg.getContact()
-        senderName = contact.pushname || contact.name || senderName
-    } catch (error) {
-        logger.error('Error getting contact info:', error)
-    }
-
-    return {
-        id: quotedMsg.id._serialized,
-        sender: quotedMsg.from,
-        senderName: senderName,
-        message: quotedMsg.body,
-        timestamp: timestamp.toISOString(),
-        isRead: false,
-        chatId: quotedMsg.from,
-        mediaUrl,
-        fileName,
-        type: quotedMsg.type,
-        fromMe: quotedMsg.fromMe,
-        status: quotedMsg.fromMe ? 'sent' : undefined
-    }
-}
-
 client.on('message_ack', (message: Message, ack: number) => {
     let status: 'sent' | 'delivered' | 'read'
     switch(ack) {
@@ -252,17 +212,23 @@ const sendMessageHandler: RequestHandler = async (req, res) => {
         let mediaUrl = null
         let fileName = null
 
+        const options: any = {}
+        if (replyTo) {
+            options.quotedMessageId = replyTo.id
+        }
+
         if (media) {
             const messageMedia = new MessageMedia(
                 media.mimetype,
                 media.buffer.toString('base64'),
                 media.originalname
             )
-            sentMessage = await client.sendMessage(chatId, messageMedia, { caption: message })
+            options.caption = message
+
+            sentMessage = await client.sendMessage(chatId, messageMedia, options)
             mediaUrl = `data:${media.mimetype};base64,${media.buffer.toString('base64')}`
             fileName = media.originalname
         } else {
-            const options = replyTo ? { quotedMessageId: replyTo.id } : {}
             sentMessage = await client.sendMessage(chatId, message, options)
         }
 
@@ -270,7 +236,7 @@ const sendMessageHandler: RequestHandler = async (req, res) => {
             id: sentMessage.id._serialized,
             sender: sentMessage.from,
             senderName: userName || sentMessage.from.split('@')[0],
-            message: sentMessage.body,
+            message: message || (media ? fileName : ''),
             timestamp: new Date().toISOString(),
             isRead: false,
             chatId: chatId,
@@ -279,7 +245,12 @@ const sendMessageHandler: RequestHandler = async (req, res) => {
             type: media ? (media.mimetype.startsWith('image') ? 'image' : 'document') : 'text',
             fromMe: true,
             status: 'sent',
-            replyTo
+            replyTo: replyTo ? {
+                ...replyTo,
+                mediaUrl: replyTo.mediaUrl || null,
+                fileName: replyTo.fileName || null,
+                type: replyTo.type || 'text'
+            } : null
         }
 
         io.emit('message', messageData)
@@ -288,6 +259,50 @@ const sendMessageHandler: RequestHandler = async (req, res) => {
     } catch (error) {
         logger.error('Error sending message:', error)
         res.status(500).json({ error: 'Failed to send message' })
+    }
+}
+
+const getQuotedMessageData = async (message: Message): Promise<MessageData> => {
+    const quotedMsg = await message.getQuotedMessage()
+    const timestamp = new Date(quotedMsg.timestamp * 1000)
+
+    let mediaUrl = null
+    let fileName = null
+    let type = quotedMsg.type
+
+    if (quotedMsg.hasMedia) {
+        try {
+            const media = await quotedMsg.downloadMedia()
+            mediaUrl = `data:${media.mimetype};base64,${media.data}`
+            fileName = media.filename || 'Download Document'
+            type = media.mimetype.startsWith('image') ? MessageTypes.IMAGE : MessageTypes.DOCUMENT
+        } catch (error) {
+            logger.error('Error downloading quoted message media:', error)
+            type = quotedMsg.type
+        }
+    }
+
+    let senderName = quotedMsg.from.split('@')[0]
+    try {
+        const contact = await quotedMsg.getContact()
+        senderName = contact.pushname || contact.name || senderName
+    } catch (error) {
+        logger.error('Error getting quoted message contact info:', error)
+    }
+
+    return {
+        id: quotedMsg.id._serialized,
+        sender: quotedMsg.from,
+        senderName: senderName,
+        message: quotedMsg.body || (fileName ? `Media: ${fileName}` : ''),
+        timestamp: timestamp.toISOString(),
+        isRead: false,
+        chatId: quotedMsg.from,
+        mediaUrl,
+        fileName,
+        type,
+        fromMe: quotedMsg.fromMe,
+        status: quotedMsg.fromMe ? 'sent' : undefined
     }
 }
 

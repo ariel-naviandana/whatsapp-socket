@@ -62,21 +62,31 @@ function createMessageElement(message, isOwnMessage) {
 
         const replyMessageElement = document.createElement('div')
         replyMessageElement.className = 'reply-message'
-        replyMessageElement.textContent = message.replyTo.message
-        replyContainer.appendChild(replyMessageElement)
 
-        if (message.replyTo.mediaUrl && message.replyTo.type === 'image') {
+        if (message.replyTo.type === 'image') {
             const replyImage = document.createElement('img')
             replyImage.className = 'reply-image'
-            replyImage.src = message.replyTo.mediaUrl
+            replyImage.src = message.replyTo.mediaUrl || ''
+            replyImage.alt = 'Reply Image'
             replyContainer.appendChild(replyImage)
-        } else if (message.replyTo.mediaUrl && message.replyTo.type === 'document') {
-            const replyDocument = document.createElement('a')
+
+            if (message.replyTo.message) {
+                replyMessageElement.textContent = message.replyTo.message
+                replyContainer.appendChild(replyMessageElement)
+            }
+        } else if (message.replyTo.type === 'document') {
+            const replyDocument = document.createElement('div')
             replyDocument.className = 'reply-document'
-            replyDocument.href = message.replyTo.mediaUrl
-            replyDocument.textContent = message.replyTo.fileName || 'Download Document'
-            replyDocument.download = message.replyTo.fileName || 'document'
+            replyDocument.innerHTML = `📎 ${message.replyTo.fileName || 'Document'}`
             replyContainer.appendChild(replyDocument)
+
+            if (message.replyTo.message) {
+                replyMessageElement.textContent = message.replyTo.message
+                replyContainer.appendChild(replyMessageElement)
+            }
+        } else {
+            replyMessageElement.textContent = message.replyTo.message
+            replyContainer.appendChild(replyMessageElement)
         }
 
         messageContent.appendChild(replyContainer)
@@ -434,11 +444,20 @@ async function sendMessage() {
     const formData = new FormData()
     formData.append('chatId', currentChat.id)
     formData.append('message', message)
+
     if (file) {
         formData.append('media', file)
     }
+
     if (replyMessage) {
-        formData.append('replyTo', JSON.stringify(replyMessage))
+        const replyData = {
+            id: replyMessage.id,
+            message: replyMessage.message,
+            type: replyMessage.type,
+            mediaUrl: replyMessage.mediaUrl,
+            fileName: replyMessage.fileName
+        }
+        formData.append('replyTo', JSON.stringify(replyData))
     }
 
     try {
