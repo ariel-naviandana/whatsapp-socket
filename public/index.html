@@ -409,6 +409,78 @@
                 width: 100%;
             }
         }
+
+        .reply-quote {
+            padding: 6px 8px;
+            margin-bottom: 4px;
+            background-color: rgba(0, 0, 0, 0.05);
+            border-radius: 6px;
+            border-left: 4px solid #25d366;
+            position: relative;
+        }
+
+        .message.sent .reply-quote {
+            background-color: rgba(0, 0, 0, 0.05);
+        }
+
+        .message.received .reply-quote {
+            background-color: rgba(0, 0, 0, 0.05);
+        }
+
+        .reply-quote .reply-sender {
+            font-size: 13px;
+            font-weight: 500;
+            color: #25d366;
+            margin-bottom: 2px;
+        }
+
+        .reply-quote .reply-text {
+            font-size: 13px;
+            color: #666;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-bottom: 2px;
+        }
+
+        .reply-quote .reply-media {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 4px;
+        }
+
+        .reply-quote .reply-media img {
+            max-width: 50px;
+            max-height: 50px;
+            border-radius: 4px;
+            object-fit: cover;
+        }
+
+        .reply-quote .reply-media .document-icon {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .message-content {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .message.with-reply {
+            margin-top: 8px;
+        }
+
+        .reply-quote::before {
+            content: '';
+            position: absolute;
+            left: -4px;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            background-color: #25d366;
+            border-radius: 4px;
+        }
     </style>
 </head>
 <body>

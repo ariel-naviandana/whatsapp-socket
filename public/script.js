@@ -43,53 +43,66 @@ let replyMessage = null
 
 function createMessageElement(message, isOwnMessage) {
     const messageElement = document.createElement('div')
-    messageElement.className = `message ${isOwnMessage ? 'sent' : 'received'}`
+    messageElement.className = `message ${isOwnMessage ? 'sent' : 'received'} ${message.replyTo ? 'with-reply' : ''}`
     messageElement.id = `message-${message.id}`
 
     const messageContent = document.createElement('div')
     messageContent.className = 'message-content'
+
+    if (message.replyTo) {
+        const replyQuote = document.createElement('div')
+        replyQuote.className = 'reply-quote'
+
+        const replySender = document.createElement('div')
+        replySender.className = 'reply-sender'
+        replySender.textContent = message.replyTo.fromMe ? 'You' : message.replyTo.senderName
+        replyQuote.appendChild(replySender)
+
+        if (message.replyTo.type === 'image' && message.replyTo.mediaUrl) {
+            const replyMedia = document.createElement('div')
+            replyMedia.className = 'reply-media'
+
+            const replyImage = document.createElement('img')
+            replyImage.src = message.replyTo.mediaUrl
+            replyImage.alt = 'Reply Image'
+            replyMedia.appendChild(replyImage)
+
+            const replyText = document.createElement('div')
+            replyText.className = 'reply-text'
+            replyText.textContent = message.replyTo.message || 'Photo'
+            replyMedia.appendChild(replyText)
+
+            replyQuote.appendChild(replyMedia)
+        } else if (message.replyTo.type === 'document' && message.replyTo.fileName) {
+            const replyMedia = document.createElement('div')
+            replyMedia.className = 'reply-media'
+
+            const docIcon = document.createElement('span')
+            docIcon.className = 'document-icon'
+            docIcon.innerHTML = '<i class="fas fa-file"></i>'
+            replyMedia.appendChild(docIcon)
+
+            const replyText = document.createElement('div')
+            replyText.className = 'reply-text'
+            replyText.textContent = message.replyTo.fileName
+            replyMedia.appendChild(replyText)
+
+            replyQuote.appendChild(replyMedia)
+        } else {
+            const replyText = document.createElement('div')
+            replyText.className = 'reply-text'
+            replyText.textContent = message.replyTo.message
+            replyQuote.appendChild(replyText)
+        }
+
+        messageContent.appendChild(replyQuote)
+    }
 
     if (!isOwnMessage && message.senderName) {
         const senderName = document.createElement('div')
         senderName.className = 'message-sender'
         senderName.textContent = message.senderName
         messageContent.appendChild(senderName)
-    }
-
-    if (message.replyTo) {
-        const replyContainer = document.createElement('div')
-        replyContainer.className = 'reply-container'
-
-        const replyMessageElement = document.createElement('div')
-        replyMessageElement.className = 'reply-message'
-
-        if (message.replyTo.type === 'image') {
-            const replyImage = document.createElement('img')
-            replyImage.className = 'reply-image'
-            replyImage.src = message.replyTo.mediaUrl || ''
-            replyImage.alt = 'Reply Image'
-            replyContainer.appendChild(replyImage)
-
-            if (message.replyTo.message) {
-                replyMessageElement.textContent = message.replyTo.message
-                replyContainer.appendChild(replyMessageElement)
-            }
-        } else if (message.replyTo.type === 'document') {
-            const replyDocument = document.createElement('div')
-            replyDocument.className = 'reply-document'
-            replyDocument.innerHTML = `📎 ${message.replyTo.fileName || 'Document'}`
-            replyContainer.appendChild(replyDocument)
-
-            if (message.replyTo.message) {
-                replyMessageElement.textContent = message.replyTo.message
-                replyContainer.appendChild(replyMessageElement)
-            }
-        } else {
-            replyMessageElement.textContent = message.replyTo.message
-            replyContainer.appendChild(replyMessageElement)
-        }
-
-        messageContent.appendChild(replyContainer)
     }
 
     if (message.mediaUrl) {
@@ -102,13 +115,6 @@ function createMessageElement(message, isOwnMessage) {
             img.alt = 'Image'
             img.loading = 'lazy'
             mediaContainer.appendChild(img)
-        } else if (message.type === 'video') {
-            const video = document.createElement('video')
-            video.controls = true
-            const source = document.createElement('source')
-            source.src = message.mediaUrl
-            video.appendChild(source)
-            mediaContainer.appendChild(video)
         } else if (message.type === 'document') {
             const documentLink = document.createElement('a')
             documentLink.href = message.mediaUrl
