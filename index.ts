@@ -306,57 +306,116 @@ const getQuotedMessageData = async (message: Message): Promise<MessageData> => {
     }
 }
 
-const getChatHistoryHandler: RequestHandler = async (req, res) => {
+const getChatHistoryHandler: RequestHandler = async (req, res, next) => {
     try {
         const { chatId } = req.params
-        const chat = await client.getChatById(chatId)
-        const messages = await chat.fetchMessages({ limit: 50 })
+        logger.info(`Fetching chat history for chatId: ${chatId}`)
+
+        if (!chatId) {
+            logger.error('No chatId provided')
+            res.status(400).json({ error: 'ChatId is required' })
+            return
+        }
+
+        let chat
+        try {
+            chat = await client.getChatById(chatId)
+        } catch (error) {
+            logger.error(`Error getting chat for ID ${chatId}:`, error)
+            res.status(404).json({ error: `Chat not found: ${chatId}` })
+            return
+        }
+
+        let messages
+        try {
+            messages = await chat.fetchMessages({ limit: 50 })
+            logger.info(`Retrieved ${messages.length} messages for chat ${chatId}`)
+        } catch (error) {
+            logger.error(`Error fetching messages for chat ${chatId}:`, error)
+            res.status(500).json({ error: 'Failed to fetch messages' })
+            return
+        }
 
         const formattedMessages = await Promise.all(messages.map(async (msg) => {
-            let mediaUrl = null
-            let fileName = null
-            if (msg.hasMedia) {
-                try {
-                    const media = await msg.downloadMedia()
-                    mediaUrl = `data:${media.mimetype};base64,${media.data}`
-                    fileName = media.filename || 'Download Document'
-                } catch (error) {
-                    logger.error('Error downloading media:', error)
-                }
-            }
-
-            let senderName = msg.from.split('@')[0]
             try {
-                const contact = await msg.getContact()
-                senderName = contact.pushname || contact.name || senderName
-            } catch (error) {
-                logger.error('Error getting contact info:', error)
-            }
+                let mediaUrl = null
+                let fileName = null
 
-            const replyTo = msg.hasQuotedMsg ? await getQuotedMessageData(msg) : null
+                if (msg.hasMedia) {
+                    try {
+                        const media = await msg.downloadMedia()
+                        if (media) {
+                            mediaUrl = `data:${media.mimetype};base64,${media.data}`
+                            fileName = media.filename || 'Download Document'
+                        }
+                    } catch (mediaError) {
+                        logger.error(`Error downloading media for message ${msg.id._serialized}:`, mediaError)
+                    }
+                }
 
-            return {
-                id: msg.id._serialized,
-                sender: msg.from,
-                senderName: senderName,
-                message: msg.body,
-                timestamp: moment(msg.timestamp * 1000).toISOString(),
-                isRead: msg.isStatus,
-                chatId: msg.from,
-                mediaUrl,
-                fileName,
-                type: msg.hasMedia ? (msg.type === 'image' ? 'image' : 'document') : 'text',
-                fromMe: msg.fromMe,
-                status: msg.fromMe ? (msg.ack >= 3 ? 'read' : msg.ack >= 2 ? 'delivered' : 'sent') : undefined,
-                replyTo
+                let senderName = msg.from.split('@')[0]
+                try {
+                    const contact = await msg.getContact()
+                    senderName = contact.pushname || contact.name || senderName
+                } catch (contactError) {
+                    logger.error(`Error getting contact info for message ${msg.id._serialized}:`, contactError)
+                }
+
+                let replyTo = null
+                if (msg.hasQuotedMsg) {
+                    try {
+                        replyTo = await getQuotedMessageData(msg)
+                    } catch (quoteError) {
+                        logger.error(`Error processing quoted message for ${msg.id._serialized}:`, quoteError)
+                    }
+                }
+
+                return {
+                    id: msg.id._serialized,
+                    sender: msg.from,
+                    senderName: senderName,
+                    message: msg.body,
+                    timestamp: moment(msg.timestamp * 1000).toISOString(),
+                    isRead: msg.isStatus,
+                    chatId: msg.from,
+                    mediaUrl,
+                    fileName,
+                    type: msg.hasMedia ?
+                        (msg.type === MessageTypes.IMAGE ? 'image' : 'document')
+                        : 'text',
+                    fromMe: msg.fromMe,
+                    status: msg.fromMe ?
+                        (msg.ack >= 3 ? 'read' : msg.ack >= 2 ? 'delivered' : 'sent')
+                        : undefined,
+                    replyTo
+                }
+            } catch (messageError) {
+                logger.error(`Error processing message ${msg.id._serialized}:`, messageError)
+                return {
+                    id: msg.id._serialized,
+                    sender: msg.from,
+                    senderName: msg.from.split('@')[0],
+                    message: 'Error loading message',
+                    timestamp: moment(msg.timestamp * 1000).toISOString(),
+                    isRead: false,
+                    chatId: msg.from,
+                    type: 'text',
+                    fromMe: msg.fromMe,
+                    status: msg.fromMe ? 'sent' : undefined
+                }
             }
         }))
 
-        res.json(formattedMessages)
-        logger.info(`Chat history for ${chatId} fetched`)
+        const validMessages = formattedMessages.filter(msg => msg !== null)
+
+        res.json(validMessages)
+        logger.info(`Successfully sent ${validMessages.length} messages for chat ${chatId}`)
     } catch (error) {
-        logger.error('Error fetching chat history:', error)
-        res.status(500).json({ error: 'Failed to fetch chat history' })
+        logger.error('Error in getChatHistoryHandler:', error)
+        res.status(500).json({
+            error: 'Failed to fetch chat history',
+            details: error instanceof Error ? error.message : 'Unknown error'
+        })
     }
 }
 

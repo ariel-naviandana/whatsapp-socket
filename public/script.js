@@ -502,24 +502,45 @@ function loadChatHistory(chatId) {
     container.innerHTML = '<div class="loading">Loading messages...</div>'
 
     fetch(`/api/chat-history/${chatId}`)
-        .then(response => {
+        .then(async response => {
             if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`)
+                const errorData = await response.text()
+                throw new Error(`${response.status}: ${errorData}`)
             }
             return response.json()
         })
         .then(history => {
+            if (!Array.isArray(history)) {
+                throw new Error('Invalid response format')
+            }
+
             container.innerHTML = ''
+
+            if (history.length === 0) {
+                container.innerHTML = '<div class="no-messages">No messages found</div>'
+                return
+            }
+
             history.forEach(msg => {
-                const messageElement = createMessageElement(msg, msg.fromMe)
-                container.appendChild(messageElement)
+                try {
+                    const messageElement = createMessageElement(msg, msg.fromMe)
+                    container.appendChild(messageElement)
+                } catch (error) {
+                    console.error('Error creating message element:', error, msg)
+                    const errorElement = document.createElement('div')
+                    errorElement.className = 'message-error'
+                    errorElement.textContent = 'Error displaying message'
+                    container.appendChild(errorElement)
+                }
             })
             container.scrollTop = container.scrollHeight
 
-            socket.emit('markMessageAsRead', {
-                messageId: history[0]?.id,
-                chatId: chatId
-            })
+            if (history.length > 0) {
+                socket.emit('markMessageAsRead', {
+                    messageId: history[0].id,
+                    chatId: chatId
+                })
+            }
 
             setUnreadStatus(chatId, false)
             const chatItem = document.querySelector(`.chat-item[data-chat-id="${chatId}"]`)
@@ -532,7 +553,13 @@ function loadChatHistory(chatId) {
         })
         .catch(error => {
             console.error('Error loading chat history:', error)
-            container.innerHTML = `<div class="error">Error loading messages: ${error.message}</div>`
+            container.innerHTML = `
+                <div class="error">
+                    <p>Error loading messages</p>
+                    <p class="error-details">${error.message}</p>
+                    <button onclick="loadChatHistory('${chatId}')">Retry</button>
+                </div>
+            `
         })
 }
 
