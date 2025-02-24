@@ -3,28 +3,47 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "start": "npx ts-node index.ts",
-    "dev": "nodemon index.ts"
+    "start": "ts-node src/index.ts",
+    "dev": "nodemon --watch 'src/**/*.ts' --exec 'ts-node' src/index.ts",
+    "build": "tsc",
+    "lint": "eslint . --ext .ts",
+    "test": "jest"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "whatsapp",
+    "websocket",
+    "typescript",
+    "hexagonal-architecture"
+  ],
+  "author": "ariel-naviandana",
   "license": "ISC",
-  "description": "",
+  "description": "WhatsApp Web Client with Hexagonal Architecture",
   "dependencies": {
+    "awilix": "^8.0.1",
     "express": "^4.21.2",
     "log4js": "^6.9.1",
     "moment": "^2.30.1",
     "multer": "^1.4.5-lts.1",
     "qrcode-terminal": "^0.12.0",
     "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1",
     "whatsapp-web.js": "^1.23.0"
   },
   "devDependencies": {
     "@types/express": "^5.0.0",
+    "@types/jest": "^29.5.12",
     "@types/multer": "^1.4.12",
     "@types/node": "^22.13.1",
     "@types/qrcode-terminal": "^0.12.2",
     "@types/socket.io": "^3.0.1",
-    "nodemon": "^3.1.9"
+    "@types/socket.io-client": "^1.4.36",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "eslint": "^8.56.0",
+    "jest": "^29.7.0",
+    "nodemon": "^3.1.9",
+    "ts-jest": "^29.1.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
   }
 }
